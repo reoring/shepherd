@@ -1,0 +1,1 @@
+../../../skills/check-config-mappings/SKILL.md

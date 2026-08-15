@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "factContract": {
+    "requirements": [
+      {
+        "id": "query-entrypoint",
+        "description": "The native Sheperd CLI module path.",
+        "grounding": "quoted",
+        "minSupports": 1,
+        "extractor": {
+          "source": {
+            "kind": "search-open",
+            "literal": "const SHEPERD_ENTRYPOINT",
+            "path": "src/native-extension.ts",
+            "before": 0,
+            "after": 4
+          },
+          "select": {
+            "kind": "contains-all",
+            "literals": ["./sheperd-cli.ts"]
+          },
+          "capture": {
+            "kind": "quoted-string",
+            "index": 0
+          },
+          "reduce": {
+            "kind": "single",
+            "exactCount": 1
+          }
+        }
+      }
+    ],
+    "finalizer": {
+      "kind": "template",
+      "template": "query-entrypoint={{query-entrypoint}}"
+    }
+  },
+  "answerContract": {
+    "description": "Return the native Sheperd CLI module path.",
+    "pattern": "^query-entrypoint=.+$"
+  }
+}

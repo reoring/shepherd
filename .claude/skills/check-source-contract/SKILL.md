@@ -1,0 +1,1 @@
+../../../skills/check-source-contract/SKILL.md

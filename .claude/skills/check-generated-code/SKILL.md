@@ -1,0 +1,1 @@
+../../../skills/check-generated-code/SKILL.md

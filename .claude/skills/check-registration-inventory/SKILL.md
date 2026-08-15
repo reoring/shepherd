@@ -1,0 +1,1 @@
+../../../skills/check-registration-inventory/SKILL.md

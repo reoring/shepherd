@@ -1,0 +1,1 @@
+../../../skills/check-sdk-wiring/SKILL.md

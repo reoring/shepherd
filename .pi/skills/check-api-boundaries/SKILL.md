@@ -1,0 +1,1 @@
+../../../skills/check-api-boundaries/SKILL.md

@@ -1,0 +1,1 @@
+../../../skills/check-cli-registrations/SKILL.md
