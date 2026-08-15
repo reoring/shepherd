@@ -1,0 +1,2 @@
+This file verifies the contract-free Shepherd query path.
+MAGIC=FALLBACK_OK

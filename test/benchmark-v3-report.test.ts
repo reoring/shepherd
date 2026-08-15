@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -95,4 +96,12 @@ test("benchmark v3 summary exposes false passes and p95 resource use", () => {
     p95ModelCalls: 4,
     failureClasses: { timeout: 1 },
   });
+});
+
+test("ships the contract-free directory benchmark fixture", async () => {
+  const fixture = await readFile(
+    new URL("fixtures/contractless.txt", import.meta.url),
+    "utf8",
+  );
+  assert.match(fixture, /^MAGIC=FALLBACK_OK$/mu);
 });
