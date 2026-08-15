@@ -15,8 +15,8 @@ When the user supplies an existing contract, do not begin with broad repository 
 
 The commands below are authoritative. Do not search for the skill, checker, or source before running the preflight.
 
-1. Run `sheperd check "$REPO" --contract "$CONTRACT" --json`.
-2. If the installed bin is unavailable in this checkout, run `node src/sheperd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
+1. Run `shepherd check "$REPO" --contract "$CONTRACT" --json`.
+2. If the installed bin is unavailable in this checkout, run `node src/shepherd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
 3. Do not invent flags such as `--context`.
 4. On PASS, use returned grounded facts and inspect only source paths needed for the requested risk review.
 5. On FAIL, inspect only failed facts and their bounded source paths before changing the contract.
@@ -40,7 +40,7 @@ Do not use source shape as a substitute for runtime behavior tests. Keep timeout
 5. Use explicit `afterLiteral` and `beforeLiteral` scope anchors around middleware groups.
 6. Set exact cardinality from current source, without embedding expected captured values.
 7. Render a compact boundary answer from grounded facts.
-8. Run `sheperd check` locally before `/sheperd query` and in CI on relevant route/config changes.
+8. Run `shepherd check` locally before `/shepherd query` and in CI on relevant route/config changes.
 
 ## Contract Patterns
 

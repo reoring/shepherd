@@ -1,6 +1,6 @@
-# Sheperd contributor guidance
+# Shepherd contributor guidance
 
-Sheperd exposes one public contract: Pi `/sheperd query <file-or-directory> [--contract <contract.json>] -- <question>` and `/sheperd check <directory> --contract <contract.json>`, plus shell `sheperd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]` and `sheperd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]`. RLM is the internal recursive runtime technique underneath, not a public command name. Do not add compatibility aliases or deprecated commands.
+Shepherd exposes one public contract: Pi `/shepherd query <file-or-directory> [--contract <contract.json>] -- <question>` and `/shepherd check <directory> --contract <contract.json>`, plus shell `shepherd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]` and `shepherd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]`. RLM is the internal recursive runtime technique underneath, not a public command name. Do not add compatibility aliases or deprecated commands.
 
 ## Working rules
 
@@ -9,7 +9,7 @@ Sheperd exposes one public contract: Pi `/sheperd query <file-or-directory> [--c
 - Keep source inspection read-only in query and contract-check flows. Treat subprocess and Docker modes as explicit isolation choices.
 - Contract checks must remain deterministic and use zero model calls. Facts need bounded source evidence; finalizers must only consume grounded facts.
 - The staged patch runtime is experimental. Do not present it as a replacement for review, authorization, or tests.
-- Skills in `skills/`, `.pi/skills/`, `.claude/skills/`, and `.agents/skills/` are mirrored integration material. Keep their root-relative checkout commands aligned. `.pi/extensions/sheperd.ts` and `.omp/extensions/sheperd.ts` re-export `src/native-extension.ts`.
+- Skills in `skills/`, `.pi/skills/`, `.claude/skills/`, and `.agents/skills/` are mirrored integration material. Keep their root-relative checkout commands aligned. `.pi/extensions/shepherd.ts` and `.omp/extensions/shepherd.ts` re-export `src/native-extension.ts`.
 - Do not add credentials, node_modules, captured source trees, raw run logs, generated benchmark outputs, or other workload artifacts.
 
 ## Verification

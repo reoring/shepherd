@@ -136,7 +136,7 @@ test("the shipped contract grounds the native query entrypoint", async () => {
 
   assert.equal(result.status, "passed");
   assert.equal(result.modelCalls, 0);
-  assert.equal(result.answer, "query-entrypoint=./sheperd-cli.ts");
+  assert.equal(result.answer, "query-entrypoint=./shepherd-cli.ts");
   assert.equal(result.answerPattern, "passed");
   assert.equal(result.runtimeFinalized, true);
 });

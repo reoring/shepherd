@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  parseSheperdCliArguments,
-  parseSheperdNativeCommandArguments,
-} from "../src/sheperd-command.ts";
+  parseShepherdCliArguments,
+  parseShepherdNativeCommandArguments,
+} from "../src/shepherd-command.ts";
 
-test("routes Pi query and check subcommands through /sheperd", () => {
+test("routes Pi query and check subcommands through /shepherd", () => {
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       'query @"fixtures/large context" --contract @"contracts/source.json" -- Find the value',
     ),
     {
@@ -21,7 +21,7 @@ test("routes Pi query and check subcommands through /sheperd", () => {
     },
   );
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       'check @"fixtures/large context" --contract @"contracts/source.json"',
     ),
     {
@@ -33,17 +33,17 @@ test("routes Pi query and check subcommands through /sheperd", () => {
     },
   );
 
-  for (const value of ["", "context.txt -- question", "rlm context.txt -- question"]) {
+  for (const value of ["", "context.txt -- question", "legacy context.txt -- question"]) {
     assert.throws(
-      () => parseSheperdNativeCommandArguments(value),
-      /Usage: \/sheperd (?:query|check)/u,
+      () => parseShepherdNativeCommandArguments(value),
+      /Usage: \/shepherd (?:query|check)/u,
     );
   }
 });
 
-test("routes shell query and check subcommands through sheperd", () => {
+test("routes shell query and check subcommands through shepherd", () => {
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "query",
       "/workspace/repository",
       "--question",
@@ -64,7 +64,7 @@ test("routes shell query and check subcommands through sheperd", () => {
     },
   );
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "check",
       "/workspace/repository",
       "--contract",
@@ -84,10 +84,10 @@ test("routes shell query and check subcommands through sheperd", () => {
     },
   );
 
-  for (const args of [[], ["rlm"], ["query"], ["check"]]) {
+  for (const args of [[], ["legacy"], ["query"], ["check"]]) {
     assert.throws(
-      () => parseSheperdCliArguments(args),
-      /Usage: sheperd (?:query|check)/u,
+      () => parseShepherdCliArguments(args),
+      /Usage: shepherd (?:query|check)/u,
     );
   }
 });

@@ -1,6 +1,20 @@
-# Sheperd
+# Shepherd
 
-Sheperd is an independent, evidence-bound recursive runtime for [Pi](https://github.com/badlogic/pi-mono): it indexes selected source, keeps inspection read-only, and returns bounded answers or deterministic source checks without loading an entire repository into an outer model context. Sheperd is the public CLI; RLM is the recursive-runtime technique underneath, not a public command name.
+Shepherd is an independent, evidence-bound recursive runtime for [Pi](https://github.com/badlogic/pi-mono): it indexes selected source, keeps inspection read-only, and returns bounded answers or deterministic source checks without loading an entire repository into an outer model context. Shepherd is the public CLI; RLM is the recursive-runtime technique underneath, not a public command name.
+
+## One concrete before/after
+
+The matched benchmark task was to trace one handwritten SDK method into generated client code and return five exact wiring facts: the validation label, raw method, HTTP method, URL template, and idempotency header. Under the matched model, question, exact source, and 20,000-token limits, Direct Pi completed **0/3** because input-budget preflight rejected dispatch. The pre-release runtime now shipped as Shepherd completed **3/3**, with one model call per run, median **1,678 tokens**, and median cost **$0.0004716**.
+
+What becomes easier is concrete: a reviewed contract selects and grounds those five facts instead of requiring the user or model to load the monorepo blindly. The following are illustrative current commands; `.rlm/contracts/sdk-wiring.json` is an example contract owned by the target repository and does **not** ship in Shepherd:
+
+```bash
+shepherd check ./monorepo --contract .rlm/contracts/sdk-wiring.json --json
+shepherd query ./monorepo \
+  --contract .rlm/contracts/sdk-wiring.json \
+  --question "Trace one handwritten SDK method into generated client code and return the five exact wiring facts." \
+  --json
+```
 
 ## Problem
 
@@ -8,7 +22,7 @@ Large repositories do not fit safely or economically in direct model context. Re
 
 ## Solution
 
-| Problem | Sheperd mechanism |
+| Problem | Shepherd mechanism |
 |---|---|
 | A repository is too large to place in outer-model context. | File-indexed, read-only source context selects bounded evidence instead of dumping a directory. |
 | A plausible answer can be semantically wrong even when a process reports `PASS`. | Typed evidence and fact contracts ground source facts; runtime finalization owns the contracted answer. |
@@ -16,30 +30,30 @@ Large repositories do not fit safely or economically in direct model context. Re
 | A worker should not inherit host authority. | Subprocess isolation is the default; Docker is an explicit optional worker mode. |
 | A generated source change needs constrained, reviewable authority. | Observed-evidence staged patches bind host-owned targets, operations, ranges, constraints, and verification before application. |
 
-`sheperd query` asks a bounded model question over a selected file or tracked Git directory. With a contract, it uses typed facts and runtime finalization; without one, it is best effort. `sheperd check` is different: it deterministically validates a versioned source-fact contract with **zero model calls**, so source or contract drift can fail before a query spends provider budget.
+`shepherd query` asks a bounded model question over a selected file or tracked Git directory. With a contract, it uses typed facts and runtime finalization; without one, it is best effort. `shepherd check` is different: it deterministically validates a versioned source-fact contract with **zero model calls**, so source or contract drift can fail before a query spends provider budget.
 
 ## Measured evidence
 
-The following measurements were made against the pre-release runtime then labelled **Pi-RLM**, now shipped as Sheperd. They are deliberately separated by comparison type and workload.
+The following measurements were made against the pre-release runtime then labelled **Pi-RLM**, now shipped as Shepherd. They are deliberately separated by comparison type and workload.
 
-### Matched large-source extraction — Sheperd/Pi-RLM versus Direct Pi
+### Matched large-source extraction — Shepherd/Pi-RLM versus Direct Pi
 
-With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and limits, three cases were repeated three times per harness (9 runs per harness). Sheperd/Pi-RLM completed **9/9** correctly versus Direct Pi's **3/9**: **+66.7 percentage points**.
+With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and limits, three cases were repeated three times per harness (9 runs per harness). Shepherd/Pi-RLM completed **9/9** correctly versus Direct Pi's **3/9**: **+66.7 percentage points**.
 
-| Aggregate metric | Sheperd/Pi-RLM (9 runs) | Direct Pi (9 runs) | Sheperd/Pi-RLM result |
+| Aggregate metric | Shepherd/Pi-RLM (9 runs) | Direct Pi (9 runs) | Shepherd/Pi-RLM result |
 |---|---:|---:|---:|
 | Correct | 9/9 | 3/9 | +66.7 percentage points |
 | Total cost | $0.0044154 | $0.00552401 | 20.1% lower |
 | Total tokens | 14,969 | 20,027 | 25.3% lower |
 | Model calls | 9 | 14 | 5 fewer |
 
-Direct Pi's six failures were fail-closed input-budget preflight rejections, not semantic wrong answers. The pre-release Sheperd/Pi-RLM run used task-specific typed contracts; Direct Pi did not have an equivalent contract.
+Direct Pi's six failures were fail-closed input-budget preflight rejections, not semantic wrong answers. The pre-release Shepherd/Pi-RLM run used task-specific typed contracts; Direct Pi did not have an equivalent contract.
 
-### Matched staged patch tasks — Sheperd/Pi-RLM versus Direct Pi
+### Matched staged patch tasks — Shepherd/Pi-RLM versus Direct Pi
 
-Using the same exact source, task, model, limits, and verification profile, each harness ran 15 times. Sheperd/Pi-RLM completed **15/15** accepted-correct runs versus Direct Pi's **9/15**: **+40 percentage points**. Direct Pi recorded **6 false successes** and **4 scope violations**.
+Using the same exact source, task, model, limits, and verification profile, each harness ran 15 times. Shepherd/Pi-RLM completed **15/15** accepted-correct runs versus Direct Pi's **9/15**: **+40 percentage points**. Direct Pi recorded **6 false successes** and **4 scope violations**.
 
-| Aggregate metric | Sheperd/Pi-RLM (15 runs) | Direct Pi (15 runs) | Sheperd/Pi-RLM result |
+| Aggregate metric | Shepherd/Pi-RLM (15 runs) | Direct Pi (15 runs) | Shepherd/Pi-RLM result |
 |---|---:|---:|---:|
 | Accepted-correct | 15/15 | 9/15 | +40 percentage points |
 | Total cost | $0.0043694 | $0.0078394 | 44.3% lower |
@@ -80,22 +94,22 @@ Use a direct source read, search, language-service query, or test when that is s
 
 ## Quickstart
 
-Sheperd exposes one public command name and has no compatibility aliases or deprecated public commands.
+Shepherd exposes one public command name and has no compatibility aliases or deprecated public commands.
 
 ### Pi native commands
 
 ```text
-/sheperd query <file-or-directory> [--contract <contract.json>] -- <question>
-/sheperd check <directory> --contract <contract.json>
+/shepherd query <file-or-directory> [--contract <contract.json>] -- <question>
+/shepherd check <directory> --contract <contract.json>
 ```
 
 ### Installed executable syntax
 
-If the `sheperd` executable is available in the environment, use:
+If the `shepherd` executable is available in the environment, use:
 
 ```text
-sheperd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]
-sheperd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
+shepherd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]
+shepherd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
 ```
 
 ### Repository checkout syntax
@@ -103,21 +117,21 @@ sheperd check <directory> --contract <contract.json> [--isolation subprocess|doc
 From a checkout with Node.js 24 or newer:
 
 ```bash
-git clone https://github.com/reoring/sheperd.git
-cd sheperd
+git clone https://github.com/reoring/shepherd.git
+cd shepherd
 npm ci
 ```
 
 ```text
-node src/sheperd-cli.ts query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]
-node src/sheperd-cli.ts check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
+node src/shepherd-cli.ts query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]
+node src/shepherd-cli.ts check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
 ```
 
 For a contract-backed query, run `check` first and stop if it fails. The bundled contract is a small repository-neutral parser example; contracts for another repository belong with that repository's reviewed source.
 
 ## Agent skills
 
-Skill names describe the task; Sheperd is the public CLI and RLM is the recursive-runtime technique underneath. The same canonical skills are exposed to Pi, OMP, Claude, and Agents:
+Skill names describe the task; Shepherd is the public CLI and RLM is the recursive-runtime technique underneath. The same canonical skills are exposed to Pi, OMP, Claude, and Agents:
 
 | Skill | Use |
 |---|---|
@@ -140,10 +154,10 @@ Choose the context path deliberately: the runtime reads indexed source context a
 
 ## Attribution
 
-Sheperd is independently implemented and is inspired by [alexzhang13/rlm](https://github.com/alexzhang13/rlm) and the paper [Recursive Language Models (arXiv:2512.24601)](https://arxiv.org/abs/2512.24601). It is not affiliated with that project or its authors.
+Shepherd is independently implemented and is inspired by [alexzhang13/rlm](https://github.com/alexzhang13/rlm) and the paper [Recursive Language Models (arXiv:2512.24601)](https://arxiv.org/abs/2512.24601). It is not affiliated with that project or its authors.
 
 There is no npm or PyPI release yet.
 
 ## License
 
-Sheperd is licensed under [Apache-2.0](LICENSE).
+Shepherd is licensed under [Apache-2.0](LICENSE).

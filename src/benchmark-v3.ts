@@ -41,8 +41,8 @@ interface CliExecution {
   processError?: string;
 }
 
-const SHEPERD_ENTRYPOINT = fileURLToPath(
-  new URL("./sheperd-cli.ts", import.meta.url),
+const SHEPHERD_ENTRYPOINT = fileURLToPath(
+  new URL("./shepherd-cli.ts", import.meta.url),
 );
 const SCENARIOS: readonly BenchmarkScenario[] = [
   {
@@ -68,9 +68,9 @@ function resolveRepeats(): number {
 }
 
 function resolveIsolationMode(): "subprocess" | "docker" {
-  const value = process.env.SHEPERD_ISOLATION ?? "subprocess";
+  const value = process.env.SHEPHERD_ISOLATION ?? "subprocess";
   if (value !== "subprocess" && value !== "docker") {
-    throw new Error(`Unsupported SHEPERD_ISOLATION: ${value}`);
+    throw new Error(`Unsupported SHEPHERD_ISOLATION: ${value}`);
   }
   return value;
 }
@@ -108,7 +108,7 @@ function executeQuery(args: readonly string[], cwd: string): Promise<CliExecutio
   const { promise, resolve: complete, reject } = Promise.withResolvers<CliExecution>();
   execFile(
     process.execPath,
-    [SHEPERD_ENTRYPOINT, ...args],
+    [SHEPHERD_ENTRYPOINT, ...args],
     { cwd, maxBuffer: 4 * 1024 * 1024, timeout: 200_000 },
     (error, stdout, stderr) => {
       if (!error) {
@@ -139,7 +139,7 @@ function parseObject(value: string, label: string): Record<string, unknown> {
 }
 
 function parseSuccess(value: string): CliSuccess {
-  const output = parseObject(value, "Sheperd query success output");
+  const output = parseObject(value, "Shepherd query success output");
   if (
     output.status !== "passed" ||
     typeof output.answer !== "string" ||
@@ -148,7 +148,7 @@ function parseSuccess(value: string): CliSuccess {
     !output.usage ||
     typeof output.usage !== "object"
   ) {
-    throw new Error("Sheperd query returned an invalid success payload");
+    throw new Error("Shepherd query returned an invalid success payload");
   }
   return output as unknown as CliSuccess;
 }
@@ -156,7 +156,7 @@ function parseSuccess(value: string): CliSuccess {
 function parseFailure(execution: CliExecution): CliFailure {
   if (execution.stderr.trim()) {
     try {
-      const output = parseObject(execution.stderr, "Sheperd query failure output");
+      const output = parseObject(execution.stderr, "Shepherd query failure output");
       if (output.status === "failed" && typeof output.error === "string") {
         return output as unknown as CliFailure;
       }
@@ -166,14 +166,14 @@ function parseFailure(execution: CliExecution): CliFailure {
   }
   return {
     status: "failed",
-    error: (execution.processError ?? execution.stderr.trim()) || "Sheperd query failed",
+    error: (execution.processError ?? execution.stderr.trim()) || "Shepherd query failed",
   };
 }
 
 const packageRoot = process.cwd();
 const repeats = resolveRepeats();
 const isolationMode = resolveIsolationMode();
-const model = process.env.SHEPERD_MODEL ?? "openai/gpt-5.6-luna";
+const model = process.env.SHEPHERD_MODEL ?? "openai/gpt-5.6-luna";
 const outputPrefix = resolveOutputPrefix();
 const outputPath = resolve(packageRoot, `${outputPrefix}-results.json`);
 const runsPath = resolve(packageRoot, `${outputPrefix}-runs.jsonl`);
@@ -265,7 +265,7 @@ const accepted = summaries.every(
     summary.errorLikePasses <= acceptance.maximumErrorLikePasses,
 );
 const report = {
-  benchmark: "sheperd-v3-core-stability",
+  benchmark: "shepherd-v3-core-stability",
   generatedAt: new Date().toISOString(),
   model,
   isolationMode,

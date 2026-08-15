@@ -4,20 +4,20 @@
     "requirements": [
       {
         "id": "query-entrypoint",
-        "description": "The native Sheperd CLI module path.",
+        "description": "The native Shepherd CLI module path.",
         "grounding": "quoted",
         "minSupports": 1,
         "extractor": {
           "source": {
             "kind": "search-open",
-            "literal": "const SHEPERD_ENTRYPOINT",
+            "literal": "const SHEPHERD_ENTRYPOINT",
             "path": "src/native-extension.ts",
             "before": 0,
             "after": 4
           },
           "select": {
             "kind": "contains-all",
-            "literals": ["./sheperd-cli.ts"]
+            "literals": ["./shepherd-cli.ts"]
           },
           "capture": {
             "kind": "quoted-string",
@@ -36,7 +36,7 @@
     }
   },
   "answerContract": {
-    "description": "Return the native Sheperd CLI module path.",
+    "description": "Return the native Shepherd CLI module path.",
     "pattern": "^query-entrypoint=.+$"
   }
 }

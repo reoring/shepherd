@@ -19,20 +19,20 @@ Prove that a versioned RLM contract matches the current tracked source without i
 
 ## First Action
 
-The checker and skill locations are already resolved. Do not run `ls`, `find`, `which`, or `cat SKILL.md`. When `src/sheperd-cli.ts` exists from the current repository root, run the `node src/sheperd-cli.ts check` command immediately; otherwise use `sheperd check`.
+The checker and skill locations are already resolved. Do not run `ls`, `find`, `which`, or `cat SKILL.md`. When `src/shepherd-cli.ts` exists from the current repository root, run the `node src/shepherd-cli.ts check` command immediately; otherwise use `shepherd check`.
 
 ## Command
 
 Installed package:
 
 ```bash
-sheperd check "$REPO" --contract "$CONTRACT" --json
+shepherd check "$REPO" --contract "$CONTRACT" --json
 ```
 
 This repository checkout, from the repository root:
 
 ```bash
-node src/sheperd-cli.ts check \
+node src/shepherd-cli.ts check \
   "$REPO" --contract "$CONTRACT" --json
 ```
 
@@ -73,7 +73,7 @@ Do not change cardinality, anchors, or selectors only to make the check green. R
 
 The deterministic checker core remains the authority:
 
-- OMP and Pi: native `/sheperd check` executes immediately without an outer-agent model turn.
+- OMP and Pi: native `/shepherd check` executes immediately without an outer-agent model turn.
 - Claude: use the direct shell command for an explicit check; use `/check-source-contract` only when Claude must select the workflow.
 - CI: use the headless command without provider credentials.
 

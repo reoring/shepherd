@@ -7,21 +7,21 @@ import {
 } from "./contract-check.ts";
 import { parseRlmContractFile } from "./contract-file.ts";
 import { loadGitDirectoryContext } from "./file-context.ts";
-import type { SheperdCheckCliArguments } from "./sheperd-command.ts";
+import type { ShepherdCheckCliArguments } from "./shepherd-command.ts";
 
-export async function runSheperdCheckCommand(
-  parsed: SheperdCheckCliArguments,
+export async function runShepherdCheckCommand(
+  parsed: ShepherdCheckCliArguments,
 ): Promise<number> {
   try {
     const contextPath = resolve(process.cwd(), parsed.contextPath);
     const contextPathInfo = await stat(contextPath);
     if (!contextPathInfo.isDirectory()) {
-      throw new Error(`Sheperd check context path is not a directory: ${parsed.contextPath}`);
+      throw new Error(`Shepherd check context path is not a directory: ${parsed.contextPath}`);
     }
     const contractPath = resolve(process.cwd(), parsed.contractPath);
     const contractPathInfo = await stat(contractPath);
     if (!contractPathInfo.isFile()) {
-      throw new Error(`Sheperd contract path is not a file: ${parsed.contractPath}`);
+      throw new Error(`Shepherd contract path is not a file: ${parsed.contractPath}`);
     }
 
     const contractFile = parseRlmContractFile(await readFile(contractPath, "utf8"));
@@ -45,7 +45,7 @@ export async function runSheperdCheckCommand(
     return result.status === "passed" ? 0 : 1;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`Sheperd configuration or file error: ${detail}\n`);
+    process.stderr.write(`Shepherd configuration or file error: ${detail}\n`);
     return 2;
   }
 }

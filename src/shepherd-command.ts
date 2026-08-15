@@ -1,41 +1,41 @@
-const SHEPERD_QUERY_USAGE =
-  "Usage: /sheperd query <file-or-directory> [--contract <contract.json>] -- <question>";
-const SHEPERD_CHECK_USAGE =
-  "Usage: /sheperd check <directory> --contract <contract.json>";
-const SHEPERD_CHECK_CLI_USAGE =
-  "Usage: sheperd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]";
-const SHEPERD_QUERY_CLI_USAGE =
-  "Usage: sheperd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]";
+const SHEPHERD_QUERY_USAGE =
+  "Usage: /shepherd query <file-or-directory> [--contract <contract.json>] -- <question>";
+const SHEPHERD_CHECK_USAGE =
+  "Usage: /shepherd check <directory> --contract <contract.json>";
+const SHEPHERD_CHECK_CLI_USAGE =
+  "Usage: shepherd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]";
+const SHEPHERD_QUERY_CLI_USAGE =
+  "Usage: shepherd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]";
 
-export interface SheperdQueryCommandArguments {
+export interface ShepherdQueryCommandArguments {
   contextPath: string;
   contractPath?: string;
   question: string;
 }
 
-export interface SheperdCheckCommandArguments {
+export interface ShepherdCheckCommandArguments {
   contextPath: string;
   contractPath: string;
 }
 
-export interface SheperdCheckCliArguments extends SheperdCheckCommandArguments {
+export interface ShepherdCheckCliArguments extends ShepherdCheckCommandArguments {
   isolationMode: "subprocess" | "docker";
   outputFormat: "text" | "json";
 }
 
-export interface SheperdQueryCliArguments extends SheperdQueryCommandArguments {
+export interface ShepherdQueryCliArguments extends ShepherdQueryCommandArguments {
   modelSpec?: string;
   isolationMode: "subprocess" | "docker";
   outputFormat: "text" | "json";
 }
 
-export type SheperdNativeCommand =
-  | { command: "query"; arguments: SheperdQueryCommandArguments }
-  | { command: "check"; arguments: SheperdCheckCommandArguments };
+export type ShepherdNativeCommand =
+  | { command: "query"; arguments: ShepherdQueryCommandArguments }
+  | { command: "check"; arguments: ShepherdCheckCommandArguments };
 
-export type SheperdCliCommand =
-  | { command: "query"; arguments: SheperdQueryCliArguments }
-  | { command: "check"; arguments: SheperdCheckCliArguments };
+export type ShepherdCliCommand =
+  | { command: "query"; arguments: ShepherdQueryCliArguments }
+  | { command: "check"; arguments: ShepherdCheckCliArguments };
 
 function usageError(usage: string): Error {
   return new Error(usage);
@@ -100,46 +100,46 @@ function normalizePathToken(value: string, usage: string): string {
   return path;
 }
 
-export function parseSheperdQueryCommandArguments(
+export function parseShepherdQueryCommandArguments(
   args: string,
-): SheperdQueryCommandArguments {
-  const separatorIndex = questionSeparatorIndex(args, SHEPERD_QUERY_USAGE);
-  if (separatorIndex < 0) throw usageError(SHEPERD_QUERY_USAGE);
+): ShepherdQueryCommandArguments {
+  const separatorIndex = questionSeparatorIndex(args, SHEPHERD_QUERY_USAGE);
+  if (separatorIndex < 0) throw usageError(SHEPHERD_QUERY_USAGE);
   const prefix = args.slice(0, separatorIndex).trim();
   const question = args.slice(separatorIndex + 2).trim();
-  if (!prefix || !question) throw usageError(SHEPERD_QUERY_USAGE);
+  if (!prefix || !question) throw usageError(SHEPHERD_QUERY_USAGE);
 
-  const tokens = tokenizePrefix(prefix, SHEPERD_QUERY_USAGE);
+  const tokens = tokenizePrefix(prefix, SHEPHERD_QUERY_USAGE);
   if (tokens.length === 1) {
     return {
-      contextPath: normalizePathToken(tokens[0]!, SHEPERD_QUERY_USAGE),
+      contextPath: normalizePathToken(tokens[0]!, SHEPHERD_QUERY_USAGE),
       question,
     };
   }
   if (tokens.length === 3 && tokens[1] === "--contract") {
     return {
-      contextPath: normalizePathToken(tokens[0]!, SHEPERD_QUERY_USAGE),
-      contractPath: normalizePathToken(tokens[2]!, SHEPERD_QUERY_USAGE),
+      contextPath: normalizePathToken(tokens[0]!, SHEPHERD_QUERY_USAGE),
+      contractPath: normalizePathToken(tokens[2]!, SHEPHERD_QUERY_USAGE),
       question,
     };
   }
-  throw usageError(SHEPERD_QUERY_USAGE);
+  throw usageError(SHEPHERD_QUERY_USAGE);
 }
 
-export function parseSheperdCheckCommandArguments(
+export function parseShepherdCheckCommandArguments(
   args: string,
-): SheperdCheckCommandArguments {
-  const tokens = tokenizePrefix(args.trim(), SHEPERD_CHECK_USAGE);
+): ShepherdCheckCommandArguments {
+  const tokens = tokenizePrefix(args.trim(), SHEPHERD_CHECK_USAGE);
   if (tokens.length !== 3 || tokens[1] !== "--contract") {
-    throw usageError(SHEPERD_CHECK_USAGE);
+    throw usageError(SHEPHERD_CHECK_USAGE);
   }
   return {
-    contextPath: normalizePathToken(tokens[0]!, SHEPERD_CHECK_USAGE),
-    contractPath: normalizePathToken(tokens[2]!, SHEPERD_CHECK_USAGE),
+    contextPath: normalizePathToken(tokens[0]!, SHEPHERD_CHECK_USAGE),
+    contractPath: normalizePathToken(tokens[2]!, SHEPHERD_CHECK_USAGE),
   };
 }
 
-export function parseSheperdNativeCommandArguments(args: string): SheperdNativeCommand {
+export function parseShepherdNativeCommandArguments(args: string): ShepherdNativeCommand {
   const trimmed = args.trim();
   const separatorIndex = trimmed.search(/\s/u);
   const command = separatorIndex < 0 ? trimmed : trimmed.slice(0, separatorIndex);
@@ -148,41 +148,41 @@ export function parseSheperdNativeCommandArguments(args: string): SheperdNativeC
   if (command === "query") {
     return {
       command,
-      arguments: parseSheperdQueryCommandArguments(commandArguments),
+      arguments: parseShepherdQueryCommandArguments(commandArguments),
     };
   }
   if (command === "check") {
     return {
       command,
-      arguments: parseSheperdCheckCommandArguments(commandArguments),
+      arguments: parseShepherdCheckCommandArguments(commandArguments),
     };
   }
-  throw usageError(SHEPERD_QUERY_USAGE);
+  throw usageError(SHEPHERD_QUERY_USAGE);
 }
 
-export function parseSheperdCheckCliArguments(
+export function parseShepherdCheckCliArguments(
   args: readonly string[],
-): SheperdCheckCliArguments {
+): ShepherdCheckCliArguments {
   if (args.length < 3 || !args[0] || args[0].startsWith("--")) {
-    throw usageError(SHEPERD_CHECK_CLI_USAGE);
+    throw usageError(SHEPHERD_CHECK_CLI_USAGE);
   }
   let contractPath: string | undefined;
-  let isolationMode: SheperdCheckCliArguments["isolationMode"] = "subprocess";
-  let outputFormat: SheperdCheckCliArguments["outputFormat"] = "text";
+  let isolationMode: ShepherdCheckCliArguments["isolationMode"] = "subprocess";
+  let outputFormat: ShepherdCheckCliArguments["outputFormat"] = "text";
   let isolationConfigured = false;
   for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--contract" && contractPath === undefined) {
       const value = args[index + 1];
-      if (!value || value.startsWith("--")) throw usageError(SHEPERD_CHECK_CLI_USAGE);
-      contractPath = normalizePathToken(value, SHEPERD_CHECK_CLI_USAGE);
+      if (!value || value.startsWith("--")) throw usageError(SHEPHERD_CHECK_CLI_USAGE);
+      contractPath = normalizePathToken(value, SHEPHERD_CHECK_CLI_USAGE);
       index += 1;
       continue;
     }
     if (argument === "--isolation" && !isolationConfigured) {
       const value = args[index + 1];
       if (value !== "subprocess" && value !== "docker") {
-        throw usageError(SHEPERD_CHECK_CLI_USAGE);
+        throw usageError(SHEPHERD_CHECK_CLI_USAGE);
       }
       isolationMode = value;
       isolationConfigured = true;
@@ -193,41 +193,41 @@ export function parseSheperdCheckCliArguments(
       outputFormat = "json";
       continue;
     }
-    throw usageError(SHEPERD_CHECK_CLI_USAGE);
+    throw usageError(SHEPHERD_CHECK_CLI_USAGE);
   }
-  if (!contractPath) throw usageError(SHEPERD_CHECK_CLI_USAGE);
+  if (!contractPath) throw usageError(SHEPHERD_CHECK_CLI_USAGE);
   return {
-    contextPath: normalizePathToken(args[0], SHEPERD_CHECK_CLI_USAGE),
+    contextPath: normalizePathToken(args[0], SHEPHERD_CHECK_CLI_USAGE),
     contractPath,
     isolationMode,
     outputFormat,
   };
 }
 
-export function parseSheperdQueryCliArguments(
+export function parseShepherdQueryCliArguments(
   args: readonly string[],
-): SheperdQueryCliArguments {
+): ShepherdQueryCliArguments {
   if (args.length < 3 || !args[0] || args[0].startsWith("--")) {
-    throw usageError(SHEPERD_QUERY_CLI_USAGE);
+    throw usageError(SHEPHERD_QUERY_CLI_USAGE);
   }
   let contractPath: string | undefined;
   let question: string | undefined;
   let modelSpec: string | undefined;
-  let isolationMode: SheperdQueryCliArguments["isolationMode"] = "subprocess";
-  let outputFormat: SheperdQueryCliArguments["outputFormat"] = "text";
+  let isolationMode: ShepherdQueryCliArguments["isolationMode"] = "subprocess";
+  let outputFormat: ShepherdQueryCliArguments["outputFormat"] = "text";
   let isolationConfigured = false;
   for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
     const value = args[index + 1];
     if (argument === "--contract" && contractPath === undefined) {
-      if (!value || value.startsWith("--")) throw usageError(SHEPERD_QUERY_CLI_USAGE);
-      contractPath = normalizePathToken(value, SHEPERD_QUERY_CLI_USAGE);
+      if (!value || value.startsWith("--")) throw usageError(SHEPHERD_QUERY_CLI_USAGE);
+      contractPath = normalizePathToken(value, SHEPHERD_QUERY_CLI_USAGE);
       index += 1;
       continue;
     }
     if (argument === "--question" && question === undefined) {
       if (!value || value.startsWith("--") || value.trim().length === 0) {
-        throw usageError(SHEPERD_QUERY_CLI_USAGE);
+        throw usageError(SHEPHERD_QUERY_CLI_USAGE);
       }
       question = value;
       index += 1;
@@ -240,7 +240,7 @@ export function parseSheperdQueryCliArguments(
         value.indexOf("/") <= 0 ||
         value.endsWith("/")
       ) {
-        throw usageError(SHEPERD_QUERY_CLI_USAGE);
+        throw usageError(SHEPHERD_QUERY_CLI_USAGE);
       }
       modelSpec = value;
       index += 1;
@@ -248,7 +248,7 @@ export function parseSheperdQueryCliArguments(
     }
     if (argument === "--isolation" && !isolationConfigured) {
       if (value !== "subprocess" && value !== "docker") {
-        throw usageError(SHEPERD_QUERY_CLI_USAGE);
+        throw usageError(SHEPHERD_QUERY_CLI_USAGE);
       }
       isolationMode = value;
       isolationConfigured = true;
@@ -259,11 +259,11 @@ export function parseSheperdQueryCliArguments(
       outputFormat = "json";
       continue;
     }
-    throw usageError(SHEPERD_QUERY_CLI_USAGE);
+    throw usageError(SHEPHERD_QUERY_CLI_USAGE);
   }
-  if (!question) throw usageError(SHEPERD_QUERY_CLI_USAGE);
+  if (!question) throw usageError(SHEPHERD_QUERY_CLI_USAGE);
   return {
-    contextPath: normalizePathToken(args[0], SHEPERD_QUERY_CLI_USAGE),
+    contextPath: normalizePathToken(args[0], SHEPHERD_QUERY_CLI_USAGE),
     ...(contractPath ? { contractPath } : {}),
     question,
     ...(modelSpec ? { modelSpec } : {}),
@@ -272,19 +272,19 @@ export function parseSheperdQueryCliArguments(
   };
 }
 
-export function parseSheperdCliArguments(args: readonly string[]): SheperdCliCommand {
+export function parseShepherdCliArguments(args: readonly string[]): ShepherdCliCommand {
   const [command, ...commandArguments] = args;
   if (command === "query") {
     return {
       command,
-      arguments: parseSheperdQueryCliArguments(commandArguments),
+      arguments: parseShepherdQueryCliArguments(commandArguments),
     };
   }
   if (command === "check") {
     return {
       command,
-      arguments: parseSheperdCheckCliArguments(commandArguments),
+      arguments: parseShepherdCheckCliArguments(commandArguments),
     };
   }
-  throw usageError(SHEPERD_QUERY_CLI_USAGE);
+  throw usageError(SHEPHERD_QUERY_CLI_USAGE);
 }

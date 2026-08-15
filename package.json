@@ -1,16 +1,16 @@
 {
-  "name": "sheperd",
+  "name": "shepherd",
   "version": "0.1.0",
   "private": true,
   "description": "Independent evidence-bound recursive agent runtime for Pi.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/reoring/sheperd.git"
+    "url": "https://github.com/reoring/shepherd.git"
   },
-  "homepage": "https://github.com/reoring/sheperd#readme",
+  "homepage": "https://github.com/reoring/shepherd#readme",
   "bugs": {
-    "url": "https://github.com/reoring/sheperd/issues"
+    "url": "https://github.com/reoring/shepherd/issues"
   },
   "engines": {
     "node": ">=24"
@@ -21,13 +21,13 @@
     "skills": ["./skills"]
   },
   "bin": {
-    "sheperd": "src/sheperd-cli.ts"
+    "shepherd": "src/shepherd-cli.ts"
   },
   "scripts": {
     "benchmark:v3": "node src/benchmark-v3.ts",
     "benchmark:matched-patch": "node src/matched-patch-benchmark-cli.ts",
-    "check:contract": "node src/sheperd-cli.ts check",
-    "query": "node src/sheperd-cli.ts query",
+    "check:contract": "node src/shepherd-cli.ts check",
+    "query": "node src/shepherd-cli.ts query",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

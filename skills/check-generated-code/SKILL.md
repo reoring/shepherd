@@ -15,8 +15,8 @@ When the user supplies an existing contract, do not begin with broad repository 
 
 The commands below are authoritative. Do not search for the skill, checker, or source before running the preflight.
 
-1. Run `sheperd check "$REPO" --contract "$CONTRACT" --json`.
-2. If the installed bin is unavailable in this checkout, run `node src/sheperd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
+1. Run `shepherd check "$REPO" --contract "$CONTRACT" --json`.
+2. If the installed bin is unavailable in this checkout, run `node src/shepherd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
 3. Do not invent flags such as `--context`.
 4. On PASS, use returned grounded facts and inspect only source paths needed for the requested risk review.
 5. On FAIL, inspect only failed facts and their bounded source paths before changing the contract.
@@ -38,7 +38,7 @@ Do not use this skill to validate generated formatting, whitespace, comments, or
 3. Define one fact per public concern: method, path, header, operation ID, binding name, or field number.
 4. Use selectors that describe syntax shape without embedding the expected output value.
 5. Use exact cardinality to reject adjacent-function matches.
-6. Run `sheperd check` immediately after regeneration.
+6. Run `shepherd check` immediately after regeneration.
 7. If the generated output changes intentionally, update schema, generated file, and contract in one review.
 
 ## Good Facts

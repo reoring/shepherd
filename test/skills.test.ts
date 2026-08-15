@@ -70,12 +70,12 @@ test("exposes the same skills to OMP, Claude, and Pi", async () => {
   }
 });
 
-test("exposes native Sheperd command adapters for OMP and Pi", async () => {
+test("exposes native Shepherd command adapters for OMP and Pi", async () => {
   const ompExtension = await realpath(
-    new URL(".omp/extensions/sheperd.ts", repositoryRoot),
+    new URL(".omp/extensions/shepherd.ts", repositoryRoot),
   );
   const piExtension = await realpath(
-    new URL(".pi/extensions/sheperd.ts", repositoryRoot),
+    new URL(".pi/extensions/shepherd.ts", repositoryRoot),
   );
   assert.notEqual(ompExtension, piExtension);
 });

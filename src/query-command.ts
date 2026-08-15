@@ -6,7 +6,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { parseRlmContractFile, type RlmContractFile } from "./contract-file.ts";
 import { loadIndexedPathContext, type FileIndexedContext } from "./file-context.ts";
 import { DEFAULT_RLM_LIMITS } from "./rlm-defaults.ts";
-import type { SheperdQueryCliArguments } from "./sheperd-command.ts";
+import type { ShepherdQueryCliArguments } from "./shepherd-command.ts";
 import { PiRlmRunError, PiRlmRunner } from "./runner.ts";
 
 interface QueryInput {
@@ -18,7 +18,7 @@ interface QueryInput {
 function modelParts(spec: string): { provider: string; modelId: string } {
   const separator = spec.indexOf("/");
   if (separator <= 0 || separator === spec.length - 1) {
-    throw new Error(`Sheperd model must be provider/model: ${spec}`);
+    throw new Error(`Shepherd model must be provider/model: ${spec}`);
   }
   return {
     provider: spec.slice(0, separator),
@@ -27,15 +27,15 @@ function modelParts(spec: string): { provider: string; modelId: string } {
 }
 
 async function loadQueryInput(
-  parsed: SheperdQueryCliArguments,
+  parsed: ShepherdQueryCliArguments,
 ): Promise<QueryInput> {
   const absoluteContextPath = resolve(process.cwd(), parsed.contextPath);
   const contextPathInfo = await stat(absoluteContextPath);
   if (!contextPathInfo.isFile() && !contextPathInfo.isDirectory()) {
-    throw new Error(`Sheperd context path is not a file or directory: ${parsed.contextPath}`);
+    throw new Error(`Shepherd context path is not a file or directory: ${parsed.contextPath}`);
   }
   if (parsed.contractPath && !contextPathInfo.isDirectory()) {
-    throw new Error("Sheperd contract files require a directory context");
+    throw new Error("Shepherd contract files require a directory context");
   }
 
   const contractFile = parsed.contractPath
@@ -53,7 +53,7 @@ async function loadQueryInput(
 }
 
 function writeQueryFailure(
-  outputFormat: SheperdQueryCliArguments["outputFormat"],
+  outputFormat: ShepherdQueryCliArguments["outputFormat"],
   error: unknown,
 ): void {
   const detail = error instanceof PiRlmRunError
@@ -75,24 +75,24 @@ function writeQueryFailure(
   process.stderr.write(`${detail.error}\n`);
 }
 
-export async function runSheperdQueryCommand(
-  parsed: SheperdQueryCliArguments,
+export async function runShepherdQueryCommand(
+  parsed: ShepherdQueryCliArguments,
 ): Promise<number> {
   let input: QueryInput;
   try {
     input = await loadQueryInput(parsed);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`Sheperd configuration or file error: ${detail}\n`);
+    process.stderr.write(`Shepherd configuration or file error: ${detail}\n`);
     return 2;
   }
 
   try {
     const modelRuntime = await ModelRuntime.create();
-    const spec = parsed.modelSpec ?? process.env.SHEPERD_MODEL ?? "openai/gpt-5.6-luna";
+    const spec = parsed.modelSpec ?? process.env.SHEPHERD_MODEL ?? "openai/gpt-5.6-luna";
     const { provider, modelId } = modelParts(spec);
     const model = modelRuntime.getModel(provider, modelId);
-    if (!model) throw new Error(`Sheperd model is unavailable: ${spec}`);
+    if (!model) throw new Error(`Shepherd model is unavailable: ${spec}`);
     if (!modelRuntime.hasConfiguredAuth(model.provider)) {
       throw new Error(`Authentication is unavailable for ${model.provider}/${model.id}`);
     }
@@ -143,7 +143,7 @@ export async function runSheperdQueryCommand(
     process.stdout.write(
       parsed.outputFormat === "json"
         ? `${JSON.stringify(output, null, 2)}\n`
-        : `${result.response}\n\nSheperd completed: ${result.usage.modelCalls} model calls, ${result.usage.totalTokens} tokens\n`,
+        : `${result.response}\n\nShepherd completed: ${result.usage.modelCalls} model calls, ${result.usage.totalTokens} tokens\n`,
     );
     return 0;
   } catch (error) {

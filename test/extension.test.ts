@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  parseSheperdCliArguments,
-  parseSheperdNativeCommandArguments,
-} from "../src/sheperd-command.ts";
+  parseShepherdCliArguments,
+  parseShepherdNativeCommandArguments,
+} from "../src/shepherd-command.ts";
 
-test("parses /sheperd query context path and question around the explicit separator", () => {
+test("parses /shepherd query context path and question around the explicit separator", () => {
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       "query context.txt -- Find the MAGIC value -- exactly",
     ),
     {
@@ -23,7 +23,7 @@ test("parses /sheperd query context path and question around the explicit separa
 
 test("accepts quoted paths with spaces and Pi-style @ prefixes", () => {
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       'query @"fixtures/large context" -- Summarize it',
     ),
     {
@@ -38,7 +38,7 @@ test("accepts quoted paths with spaces and Pi-style @ prefixes", () => {
 
 test("parses an explicit versioned contract file", () => {
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       'query @"/workspace/repository" --contract @"contracts/api timeout.json" -- Trace the router',
     ),
     {
@@ -52,9 +52,9 @@ test("parses an explicit versioned contract file", () => {
   );
 });
 
-test("parses /sheperd check directory and contract paths without a question", () => {
+test("parses /shepherd check directory and contract paths without a question", () => {
   assert.deepEqual(
-    parseSheperdNativeCommandArguments(
+    parseShepherdNativeCommandArguments(
       'check @"/workspace/repository" --contract @"contracts/api timeout.json"',
     ),
     {
@@ -72,15 +72,15 @@ test("parses /sheperd check directory and contract paths without a question", ()
     "/workspace/repository --contract contract.json -- extra",
   ]) {
     assert.throws(
-      () => parseSheperdNativeCommandArguments(`check ${value}`),
-      /Usage: \/sheperd check/u,
+      () => parseShepherdNativeCommandArguments(`check ${value}`),
+      /Usage: \/shepherd check/u,
     );
   }
 });
 
-test("parses headless Sheperd check arguments and CI output controls", () => {
+test("parses headless Shepherd check arguments and CI output controls", () => {
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "check",
       "/workspace/repository",
       "--contract",
@@ -97,7 +97,7 @@ test("parses headless Sheperd check arguments and CI output controls", () => {
     },
   );
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "check",
       "/workspace/repository",
       "--contract",
@@ -122,13 +122,13 @@ test("parses headless Sheperd check arguments and CI output controls", () => {
     ["check", "/workspace/repository", "--contract", "a.json", "--unknown"],
     ["check", "/workspace/repository", "--contract", "a.json", "--isolation", "vm"],
   ]) {
-    assert.throws(() => parseSheperdCliArguments(args), /Usage: sheperd check/u);
+    assert.throws(() => parseShepherdCliArguments(args), /Usage: shepherd check/u);
   }
 });
 
-test("parses cross-harness headless Sheperd query arguments", () => {
+test("parses cross-harness headless Shepherd query arguments", () => {
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "query",
       "/workspace/repository",
       "--question",
@@ -145,7 +145,7 @@ test("parses cross-harness headless Sheperd query arguments", () => {
     },
   );
   assert.deepEqual(
-    parseSheperdCliArguments([
+    parseShepherdCliArguments([
       "query",
       "/workspace/repository",
       "--contract",
@@ -178,7 +178,7 @@ test("parses cross-harness headless Sheperd query arguments", () => {
     ["query", "/workspace/repository", "--question", "Q", "--model", "luna"],
     ["query", "/workspace/repository", "--question", "Q", "--unknown"],
   ]) {
-    assert.throws(() => parseSheperdCliArguments(args), /Usage: sheperd query/u);
+    assert.throws(() => parseShepherdCliArguments(args), /Usage: shepherd query/u);
   }
 });
 
@@ -194,8 +194,8 @@ test("rejects missing file, separator, question, and legacy subcommands", () => 
     "rlm context.txt -- question",
   ]) {
     assert.throws(
-      () => parseSheperdNativeCommandArguments(value),
-      /Usage: \/sheperd query/u,
+      () => parseShepherdNativeCommandArguments(value),
+      /Usage: \/shepherd query/u,
     );
   }
 });

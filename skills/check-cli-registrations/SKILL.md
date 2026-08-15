@@ -15,8 +15,8 @@ When the user supplies an existing contract, do not begin with broad repository 
 
 The commands below are authoritative. Do not search for the skill, checker, or source before running the preflight.
 
-1. Run `sheperd check "$REPO" --contract "$CONTRACT" --json`.
-2. If the installed bin is unavailable in this checkout, run `node src/sheperd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
+1. Run `shepherd check "$REPO" --contract "$CONTRACT" --json`.
+2. If the installed bin is unavailable in this checkout, run `node src/shepherd-cli.ts check "$REPO" --contract "$CONTRACT" --json` from the repository root.
 3. Do not invent flags such as `--context`.
 4. On PASS, use returned grounded facts and inspect only source paths needed for the requested risk review.
 5. On FAIL, inspect only failed facts and their bounded source paths before changing the contract.
@@ -39,7 +39,7 @@ Do not use this skill when commands are assembled dynamically from maps, reflect
 4. Create `.rlm/contracts/<cli-name>.v1.json` with one `constructors` fact.
 5. Use a symbol source selector, a literal line selector, `identifier-after` capture, exact-cardinality `join`, and a template finalizer.
 6. Use `grounding: derived` when the captured constructor is embedded inside an `AddCommand(...)` line.
-7. Run `sheperd check` before invoking `/sheperd query`.
+7. Run `shepherd check` before invoking `/shepherd query`.
 8. If source intentionally changes, update source and contract in the same review.
 
 ## Contract Pattern
@@ -92,13 +92,13 @@ Replace symbol, literal, and cardinality with observed source facts. Never copy 
 Installed package:
 
 ```bash
-sheperd check "$REPO" --contract "$REPO/.rlm/contracts/cli-root.v1.json" --json
+shepherd check "$REPO" --contract "$REPO/.rlm/contracts/cli-root.v1.json" --json
 ```
 
 This checkout:
 
 ```bash
-node src/sheperd-cli.ts check \
+node src/shepherd-cli.ts check \
   "$REPO" --contract "$REPO/.rlm/contracts/cli-root.v1.json" --json
 ```
 
