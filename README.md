@@ -4,7 +4,7 @@ Shepherd is an independent, evidence-bound recursive runtime for [Pi](https://gi
 
 ![Terminal demo: Direct Pi and Shepherd run three matched source-change tasks; the live comparison shows correctness, model calls, tokens, cost, false successes, and scope violations.](media/shepherd-demo.gif)
 
-<sub>50-second live matched run · same GPT-5.6 Luna, source, task, limits, and verifier · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
+<sub>50-second live matched run · plays once and stays on the result · same GPT-5.6 Luna, source, task, limits, and verifier · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
 
 ## One concrete before/after
 
