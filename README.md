@@ -2,9 +2,9 @@
 
 Shepherd is an independent, evidence-bound recursive runtime for [Pi](https://github.com/badlogic/pi-mono): it indexes selected source, keeps inspection read-only, and returns bounded answers or deterministic source checks without loading an entire repository into an outer model context. Shepherd is the public CLI; RLM is the recursive-runtime technique underneath, not a public command name.
 
-![Terminal demo: Shepherd check validates a source-fact contract with zero model calls and exits successfully; benchmark numbers are labelled as separately measured.](media/shepherd-demo.gif)
+![Terminal demo: Shepherd indexes the checkout, asks GPT-5.6 Luna a contract-backed source question, and runtime-finalizes the grounded answer under shared limits.](media/shepherd-demo.gif)
 
-<sub>33-second terminal demo · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
+<sub>Live Shepherd query over a 1.1 MB indexed checkout · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
 
 ## One concrete before/after
 
