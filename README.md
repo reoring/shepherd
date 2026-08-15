@@ -16,6 +16,25 @@ shepherd query ./monorepo \
   --json
 ```
 
+## 60-second first success
+
+With Node.js 24 or newer, this deterministic check works from a fresh checkout and needs no provider credentials:
+
+```bash
+git clone https://github.com/reoring/shepherd.git
+cd shepherd
+npm ci
+node src/shepherd-cli.ts check . --contract examples/contracts/exact-source-value.v1.json --json
+```
+
+Representative output:
+
+```json
+{"status":"passed","answer":"query-entrypoint=./shepherd-cli.ts","modelCalls":0}
+```
+
+`check` reads the selected source and evaluates the contract locally; it makes zero model calls.
+
 ## Problem
 
 Large repositories do not fit safely or economically in direct model context. Repeatedly loading source burns tokens and cost, while a process-level `PASS` can still conceal a semantically false answer. For source changes, a freeform model write also needs a bounded authority boundary rather than open-ended filesystem control.
@@ -34,11 +53,39 @@ Large repositories do not fit safely or economically in direct model context. Re
 
 ## Measured evidence
 
-The following measurements were made against the pre-release runtime then labelled **Pi-RLM**, now shipped as Shepherd. They are deliberately separated by comparison type and workload.
+### Current public-SHA evidence — [c9b0c94](https://github.com/reoring/shepherd/commit/c9b0c9461e63a588c37f1f48ab5040619352c169)
 
-### Matched large-source extraction — Shepherd/Pi-RLM versus Direct Pi
+These sanitized aggregates were measured from a clean checkout of public commit [c9b0c94](https://github.com/reoring/shepherd/commit/c9b0c9461e63a588c37f1f48ab5040619352c169) with GPT-5.6 Luna on **2026-08-15**.
 
-With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and limits, three cases were repeated three times per harness (9 runs per harness). Shepherd/Pi-RLM completed **9/9** correctly versus Direct Pi's **3/9**: **+66.7 percentage points**.
+#### Query stability — subprocess, two scenarios × 10
+
+| Scenario | Correct | False `PASS` | Median | p95 | Model calls | Tokens | Cost |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Plain file | 10/10 | 0 | 4.94 s | 5.99 s | 18 | 27,428 | $0.0085852 |
+| Directory | 10/10 | 0 | 5.03 s | 6.26 s | 17 | 24,959 | $0.0077363 |
+| **Aggregate** | **20/20** | **0** | — | — | **35** | **52,387** | **$0.0163215** |
+
+#### Matched patch tasks — Shepherd versus Direct Pi, thinking off, three tasks × 5 per harness
+
+The Direct Pi baseline was benchmark-specific: it had only host-allowlisted `read`, `edit`, and `write` tools, with no shell, search, network, extensions, or skills. Both paths used the same source, task, model, limits, and verification profile; Direct Pi ran first for each case and repeat.
+
+| Aggregate metric | Shepherd (15 runs) | Direct Pi (15 runs) | Result |
+|---|---:|---:|---:|
+| Accepted-correct | 15/15 | 9/15 | **+40 percentage points** |
+| False successes | 0 | 6 | 6 fewer |
+| Scope violations | 0 | 4 | 4 fewer |
+| Model calls | 30 | 52 | **42.3% lower** |
+| Total tokens | 15,899 | 28,278 | **43.8% lower** |
+| Total cost | $0.0043738 | $0.0073866 | **40.8% lower** |
+| Aggregate latency | 102,149.7 ms | 91,562.7 ms | **Shepherd 11.6% higher (latency regression)** |
+
+The joint benchmark exits nonzero by design unless **both** harnesses meet acceptance. Direct Pi does not meet it; Shepherd's own per-harness result is **15/15** accepted-correct runs.
+
+This supports a **limited GO** only for host-targeted replacement, insertion, exact multi-file wiring, and seeded one-file repair. It does not support general writing: the host owns target paths, operations, ranges, replacement constraints, and verification; the model supplies intent and replacement through the staged flow.
+
+### Historical pre-release evidence — matched large-source extraction
+
+With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and limits, three cases were repeated three times per harness (9 runs per harness). The pre-release runtime then labelled Pi-RLM, now shipped as Shepherd, completed **9/9** correctly versus Direct Pi's **3/9**: **+66.7 percentage points**.
 
 | Aggregate metric | Shepherd/Pi-RLM (9 runs) | Direct Pi (9 runs) | Shepherd/Pi-RLM result |
 |---|---:|---:|---:|
@@ -49,21 +96,7 @@ With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and li
 
 Direct Pi's six failures were fail-closed input-budget preflight rejections, not semantic wrong answers. The pre-release Shepherd/Pi-RLM run used task-specific typed contracts; Direct Pi did not have an equivalent contract.
 
-### Matched staged patch tasks — Shepherd/Pi-RLM versus Direct Pi
-
-Using the same exact source, task, model, limits, and verification profile, each harness ran 15 times. Shepherd/Pi-RLM completed **15/15** accepted-correct runs versus Direct Pi's **9/15**: **+40 percentage points**. Direct Pi recorded **6 false successes** and **4 scope violations**.
-
-| Aggregate metric | Shepherd/Pi-RLM (15 runs) | Direct Pi (15 runs) | Shepherd/Pi-RLM result |
-|---|---:|---:|---:|
-| Accepted-correct | 15/15 | 9/15 | +40 percentage points |
-| Total cost | $0.0043694 | $0.0078394 | 44.3% lower |
-| Total tokens | 15,887 | 30,317 | 47.6% lower |
-| Model calls | 30 | 55 | 45.5% lower |
-| Aggregate latency | 90,320.9 ms | 102,326.7 ms | 11.7% lower |
-
-This supports a **limited GO** only for host-targeted replacement, insertion, exact multi-file wiring, and seeded one-file repair. It does not support general writing: the host owns target paths, operations, ranges, replacement constraints, and verification; the model supplies intent and replacement through the staged flow.
-
-### Runtime evidence projection — before and after, not a Direct Pi comparison
+### Historical pre-release evidence — evidence projection before/after
 
 A runtime-owned evidence-projection improvement was measured on the same two scenarios, with 10 repeats each before and after (20 runs per condition). It improved extractive correctness from **16/20 to 20/20**, reduced false `PASS` from **2 to 0**, cut model calls from **70 to 36** (**48.6% lower**), and cut total cost from **$0.0264207 to $0.0167854** (**36.5% lower**).
 
@@ -71,16 +104,16 @@ This result applies to **single-line extractive answers**. It is neither a Direc
 
 ### Methodology and caveats
 
-These are dated pre-release measurements from **2026-08-13/14**, with denominators shown above. They are not a universal performance guarantee and were not rerun on current main. Raw captures are excluded because they can contain workload source and transcripts. The current [benchmark-v3 runner](src/benchmark-v3.ts), [matched-patch benchmark runner](src/matched-patch-benchmark-cli.ts), and [patch PoC runner](src/patch-poc.ts) are available for current local re-evaluation; their outputs are gitignored and must be reviewed before sharing.
+The current tables are public-SHA-bound sanitized aggregates. Raw outputs were deleted and are not published because they may include source or transcripts. Historical external-source captures remain unpublished. These measurements are not a universal performance guarantee.
 
-Exercise the current public runners with configured provider authentication:
+The [benchmark-v3 runner](src/benchmark-v3.ts) and [matched-patch benchmark runner](src/matched-patch-benchmark-cli.ts) can re-evaluate the current harness with configured provider authentication:
 
 ```bash
 npm run benchmark:v3
 npm run benchmark:matched-patch
 ```
 
-These exercise the current harness; they are not byte-for-byte reproductions of the dated tables because the measured external source snapshots are not published. Model-backed runs incur provider cost.
+Those commands incur provider cost. They exercise the current harness rather than byte-for-byte reproducing the historical tables, whose external source snapshots are not published.
 
 ## Scope
 
@@ -96,23 +129,46 @@ Use a direct source read, search, language-service query, or test when that is s
 
 Shepherd exposes one public command name and has no compatibility aliases or deprecated public commands.
 
-### Pi native commands
+### Install and activate in Pi
+
+Install Pi first if `pi` is not already available:
+
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+```
+
+Install the native Shepherd extension and its eight skills:
+
+```bash
+pi install git:github.com/reoring/shepherd --approve
+```
+
+`/shepherd check` makes zero model calls and needs no provider authentication. A model-backed query does need configured provider authentication. The value below is a placeholder; provide the credential through the shell environment and never commit it:
+
+```bash
+export OPENAI_API_KEY="..."
+pi auth check --model openai/gpt-5.6-luna --json --no-refresh
+```
+
+In the target repository, start Pi with the intended model:
+
+```bash
+pi --model openai/gpt-5.6-luna
+```
+
+Then use the native commands:
 
 ```text
-/shepherd query <file-or-directory> [--contract <contract.json>] -- <question>
 /shepherd check <directory> --contract <contract.json>
+/shepherd query <file-or-directory> [--contract <contract.json>] -- <question>
 ```
 
-### Installed executable syntax
+### Contract ownership
 
-If the `shepherd` executable is available in the environment, use:
+Contracts belong in the target repository, recommended under `.rlm/contracts/`, and are reviewed and versioned with its source. A contract defines source selection and typed capture/reduction; it may additionally define a deterministic finalizer and answer pattern. Finalization and answer-pattern guarantees apply only when those fields are configured. The bundled [`examples/contracts/exact-source-value.v1.json`](examples/contracts/exact-source-value.v1.json) is a minimal parser/runtime example, not a universal contract.
 
-```text
-shepherd query <file-or-directory> --question <text> [--contract <contract.json>] [--model provider/model] [--isolation subprocess|docker] [--json]
-shepherd check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
-```
 
-### Repository checkout syntax
+### Repository checkout CLI for automation
 
 From a checkout with Node.js 24 or newer:
 
@@ -127,7 +183,7 @@ node src/shepherd-cli.ts query <file-or-directory> --question <text> [--contract
 node src/shepherd-cli.ts check <directory> --contract <contract.json> [--isolation subprocess|docker] [--json]
 ```
 
-For a contract-backed query, run `check` first and stop if it fails. The bundled contract is a small repository-neutral parser example; contracts for another repository belong with that repository's reviewed source.
+For a contract-backed query, run `check` first and stop if it fails.
 
 ## Agent skills
 
