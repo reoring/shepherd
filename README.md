@@ -1,24 +1,18 @@
 # Shepherd
 
-Shepherd is an independent, evidence-bound recursive runtime for [Pi](https://github.com/badlogic/pi-mono): it indexes selected source, keeps inspection read-only, and returns bounded answers or deterministic source checks without loading an entire repository into an outer model context. Shepherd is the public CLI; RLM is the recursive-runtime technique underneath, not a public command name.
+Shepherd is an independent, evidence-bound recursive runtime for [Pi](https://github.com/badlogic/pi-mono). It indexes selected source for bounded answers and deterministic checks without loading an entire repository into an outer model context. Its experimental staged-patch path limits writes to host-selected targets and accepts them only after source evidence and verification pass. Shepherd is the public CLI; RLM is the recursive-runtime technique underneath, not a public command name.
 
-![Terminal demo: Shepherd indexes the checkout, asks GPT-5.6 Luna a contract-backed source question, and runtime-finalizes the grounded answer under shared limits.](media/shepherd-demo.gif)
+![Terminal demo: Direct Pi and Shepherd run three matched source-change tasks; the live comparison shows correctness, model calls, tokens, cost, false successes, and scope violations.](media/shepherd-demo.gif)
 
-<sub>Live Shepherd query over a 1.1 MB indexed checkout · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
+<sub>50-second live matched run · same GPT-5.6 Luna, source, task, limits, and verifier · [Download the asciicast recording](media/shepherd-demo.cast)</sub>
 
 ## One concrete before/after
 
-The matched benchmark task was to trace one handwritten SDK method into generated client code and return five exact wiring facts: the validation label, raw method, HTTP method, URL template, and idempotency header. Under the matched model, question, exact source, and 20,000-token limits, Direct Pi completed **0/3** because input-budget preflight rejected dispatch. The pre-release runtime now shipped as Shepherd completed **3/3**, with one model call per run, median **1,678 tokens**, and median cost **$0.0004716**.
+The live demo runs one repeat of three source-change tasks. One asks the agent to change `timeout: 10` to `timeout: 20`, preserve its consumer contract, and modify only `src/config.ts`. Direct Pi and Shepherd receive the same GPT-5.6 Luna model, source, task, limits, and verifier.
 
-What becomes easier is concrete: a reviewed contract selects and grounds those five facts instead of requiring the user or model to load the monorepo blindly. The following are illustrative current commands; `.rlm/contracts/sdk-wiring.json` is an example contract owned by the target repository and does **not** ship in Shepherd:
+Both paths happened to be correct in the recorded repeat. Shepherd reached the same accepted result with **6 instead of 12 model calls**, **3,179 instead of 6,688 tokens**, and **$0.0008778 instead of $0.0017546**—roughly half the inference work. One repeat is illustrative, not stability evidence.
 
-```bash
-shepherd check ./monorepo --contract .rlm/contracts/sdk-wiring.json --json
-shepherd query ./monorepo \
-  --contract .rlm/contracts/sdk-wiring.json \
-  --question "Trace one handwritten SDK method into generated client code and return the five exact wiring facts." \
-  --json
-```
+Across the public-SHA benchmark's five repeats of all three tasks, Shepherd completed **15/15** correctly versus Direct Pi's **9/15**, with **0 versus 6 false successes**, **0 versus 4 scope violations**, **43.8% fewer tokens**, and **40.8% lower cost**. Shepherd was **11.6% slower**. The difference is not a better prompt: the host bounds paths, operations, ranges, and verification; Shepherd accepts a patch only after the selected source evidence and focused checks pass.
 
 ## 60-second first success
 
