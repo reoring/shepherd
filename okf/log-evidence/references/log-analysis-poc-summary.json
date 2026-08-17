@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-17T09:59:09+09:00",
+  "authority": "Historical evidence for one synthetic PoC; not a normative runtime contract or population-level benchmark.",
+  "harness": {
+    "repository": "https://github.com/reoring/shepherd",
+    "commit": "5b54906bd71a0e0e45217b6b052b6311b8d79c58",
+    "model": "openai/gpt-5.6-luna",
+    "isolation": "subprocess"
+  },
+  "fixture": {
+    "format": "UTF-8 JSONL",
+    "bytes": 11534568,
+    "records": 40992,
+    "timestampsMonotonicallyIncreasing": true,
+    "rootCause": {
+      "marker": "ROOT_CAUSE_POOL_EXHAUSTED",
+      "count": 1,
+      "line": 1000
+    },
+    "timeline": {
+      "traceId": "trace-7f3a",
+      "count": 5,
+      "lines": [2000, 2001, 2002, 2003, 2004]
+    },
+    "rateLimitBurst": {
+      "marker": "RATE_LIMIT_BURST",
+      "count": 1500,
+      "firstLine": 5000,
+      "lastLine": 6499
+    }
+  },
+  "deterministicProbe": {
+    "singleFileIndexedFiles": 1,
+    "singleFileIndexedBytes": 11534568,
+    "rootCauseReturnedHits": 1,
+    "timelineReturnedHits": 5,
+    "rateLimitReturnedHits": 1000,
+    "rateLimitSearchMaxResults": 1000,
+    "rateLimitSearchTruncated": true,
+    "trackedLogFilesInDirectory": 2,
+    "trackedLogFilesIndexed": 0,
+    "allChecksPassed": true
+  },
+  "queries": [
+    {
+      "id": "exact-root-cause-line",
+      "requestedShape": "one complete JSONL source line",
+      "processStatus": "passed",
+      "actualAnswer": "timestamp",
+      "correct": false,
+      "falsePass": true,
+      "executionCount": 2,
+      "answerRejections": 0,
+      "groundedFacts": 0,
+      "runtimeFinalizations": 0,
+      "modelCalls": 2,
+      "totalTokens": 3166,
+      "costUsd": 0.0010097
+    },
+    {
+      "id": "five-event-timeline",
+      "requestedShape": "five timestamp-ordered trace events",
+      "processStatus": "passed",
+      "actualAnswer": "timestamp",
+      "correct": false,
+      "falsePass": true,
+      "executionCount": 2,
+      "answerRejections": 0,
+      "groundedFacts": 0,
+      "runtimeFinalizations": 0,
+      "modelCalls": 2,
+      "totalTokens": 3586,
+      "costUsd": 0.00110425
+    }
+  ]
+}
