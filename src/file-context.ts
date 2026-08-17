@@ -31,6 +31,30 @@ export interface IndexedSearchOptions {
   maxResults?: number;
 }
 
+export type IndexedDefinitionKind =
+  | "function"
+  | "class"
+  | "type"
+  | "interface"
+  | "enum"
+  | "namespace"
+  | "variable"
+  | "method"
+  | "struct"
+  | "trait"
+  | "constant"
+  | "static"
+  | "module";
+
+export interface IndexedListSymbolsRequest extends IndexedSearchOptions {
+  pathPrefix?: string;
+}
+
+export interface IndexedSymbolDefinition extends IndexedSearchHit {
+  name: string;
+  definitionKind: IndexedDefinitionKind;
+}
+
 export interface IndexedTextMatch {
   path: string;
   line: number;
@@ -122,6 +146,8 @@ const DEFAULT_MAX_OBSERVATION_CHARACTERS_PER_TURN = 4 * 1024;
 const DEFAULT_MAX_OBSERVED_CHARACTERS_PER_RUN = 12 * 1024;
 const DEFAULT_MAX_RESULTS = 100;
 const MAX_RESULTS = 1_000;
+const DEFAULT_MAX_SYMBOL_RESULTS = 40;
+const MAX_SYMBOL_RESULTS = 100;
 const MAX_PATTERN_CHARACTERS = 256;
 const MAX_RESULT_LINE_CHARACTERS = 500;
 
@@ -401,25 +427,87 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
-function definitionPattern(path: string, symbol: string): RegExp {
-  const escaped = escapeRegExp(symbol);
-  const extension = extname(path).toLowerCase();
-  if (extension === ".go") {
-    return new RegExp(`^\\s*(?:func\\s+(?:\\([^)]*\\)\\s*)?|type\\s+|var\\s+|const\\s+)${escaped}(?![A-Za-z0-9_$])`, "u");
+function definitionFromMatch(
+  match: RegExpMatchArray | null,
+  kinds: readonly IndexedDefinitionKind[],
+): { name: string; definitionKind: IndexedDefinitionKind } | undefined {
+  if (!match) return undefined;
+  for (let index = 1; index < match.length; index += 1) {
+    const name = match[index];
+    if (name) return { name, definitionKind: kinds[index - 1]! };
   }
+  return undefined;
+}
+
+const TYPESCRIPT_DEFINITION_PATTERN =
+  /^\s*(?:(?:export|declare|default|async|abstract)\s+)*(?:function\s*\*?\s*([A-Za-z_$][A-Za-z0-9_$]*)\b|class\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|interface\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|type\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|enum\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|namespace\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b)/u;
+const TYPESCRIPT_DEFINITION_KINDS: readonly IndexedDefinitionKind[] = [
+  "function",
+  "class",
+  "interface",
+  "type",
+  "enum",
+  "namespace",
+  "variable",
+];
+const TYPESCRIPT_METHOD_PATTERN =
+  /^\s*(?:(?:public|private|protected|static|abstract|async|override|declare|readonly|get|set|accessor)\s+)+\*?\s*([A-Za-z_$][A-Za-z0-9_$]*)(?:\s*<[^>{}()]*>)?\s*\(/u;
+const GO_DEFINITION_PATTERN =
+  /^\s*(?:func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(|type\s+([A-Za-z_][A-Za-z0-9_]*)\b|var\s+([A-Za-z_][A-Za-z0-9_]*)\b|const\s+([A-Za-z_][A-Za-z0-9_]*)\b)/u;
+const GO_DEFINITION_KINDS: readonly IndexedDefinitionKind[] = [
+  "function",
+  "type",
+  "variable",
+  "constant",
+];
+const PYTHON_DEFINITION_PATTERN =
+  /^\s*(?:(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\b|class\s+([A-Za-z_][A-Za-z0-9_]*)\b)/u;
+const PYTHON_DEFINITION_KINDS: readonly IndexedDefinitionKind[] = ["function", "class"];
+const RUST_DEFINITION_PATTERN =
+  /^\s*(?:pub(?:\([^)]*\))?\s+)?(?:(?:(?:async|unsafe|const|extern(?:\s+"[^"]+")?)\s+)*fn\s+([A-Za-z_][A-Za-z0-9_]*)\b|struct\s+([A-Za-z_][A-Za-z0-9_]*)\b|enum\s+([A-Za-z_][A-Za-z0-9_]*)\b|trait\s+([A-Za-z_][A-Za-z0-9_]*)\b|type\s+([A-Za-z_][A-Za-z0-9_]*)\b|const\s+([A-Za-z_][A-Za-z0-9_]*)\b|static\s+([A-Za-z_][A-Za-z0-9_]*)\b|mod\s+([A-Za-z_][A-Za-z0-9_]*)\b)/u;
+const RUST_DEFINITION_KINDS: readonly IndexedDefinitionKind[] = [
+  "function",
+  "struct",
+  "enum",
+  "trait",
+  "type",
+  "constant",
+  "static",
+  "module",
+];
+const GENERIC_DEFINITION_PATTERN =
+  /^\s*(?:function\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|class\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|interface\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|type\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|func\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|def\s+([A-Za-z_$][A-Za-z0-9_$]*)\b|(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\b)/u;
+const GENERIC_DEFINITION_KINDS: readonly IndexedDefinitionKind[] = [
+  "function",
+  "class",
+  "interface",
+  "type",
+  "function",
+  "function",
+  "variable",
+];
+
+function definitionForLine(
+  path: string,
+  line: string,
+): { name: string; definitionKind: IndexedDefinitionKind } | undefined {
+  const extension = extname(path).toLowerCase();
   if ([".ts", ".tsx", ".js", ".jsx"].includes(extension)) {
-    return new RegExp(
-      `^\\s*(?:(?:export|declare|default|async|abstract)\\s+)*(?:(?:function|class|interface|type|enum|namespace|const|let|var)\\s+${escaped}(?![A-Za-z0-9_$])|(?:public\\s+|private\\s+|protected\\s+|static\\s+|async\\s+)*${escaped}\\s*\\()`,
-      "u",
+    return (
+      definitionFromMatch(line.match(TYPESCRIPT_DEFINITION_PATTERN), TYPESCRIPT_DEFINITION_KINDS) ??
+      definitionFromMatch(line.match(TYPESCRIPT_METHOD_PATTERN), ["method"])
     );
   }
+  if (extension === ".go") {
+    return definitionFromMatch(line.match(GO_DEFINITION_PATTERN), GO_DEFINITION_KINDS);
+  }
   if (extension === ".py") {
-    return new RegExp(`^\\s*(?:async\\s+def|def|class)\\s+${escaped}(?![A-Za-z0-9_$])`, "u");
+    return definitionFromMatch(line.match(PYTHON_DEFINITION_PATTERN), PYTHON_DEFINITION_KINDS);
   }
   if (extension === ".rs") {
-    return new RegExp(`^\\s*(?:pub(?:\\([^)]*\\))?\\s+)?(?:fn|struct|enum|trait|type|const|static|mod)\\s+${escaped}(?![A-Za-z0-9_$])`, "u");
+    return definitionFromMatch(line.match(RUST_DEFINITION_PATTERN), RUST_DEFINITION_KINDS);
   }
-  return new RegExp(`^\\s*(?:class|interface|type|func|function|def|const|var|let)\\s+${escaped}(?![A-Za-z0-9_$])`, "u");
+  return definitionFromMatch(line.match(GENERIC_DEFINITION_PATTERN), GENERIC_DEFINITION_KINDS);
 }
 
 export class FileIndexedContext {
@@ -538,6 +626,61 @@ export class FileIndexedContext {
     return matches;
   }
 
+
+  listSymbols(
+    request: IndexedListSymbolsRequest = {},
+  ): IndexedSymbolDefinition[] {
+    const maxResults = normalizeMaxResults(
+      request.maxResults ?? DEFAULT_MAX_SYMBOL_RESULTS,
+    );
+    if (maxResults > MAX_SYMBOL_RESULTS) {
+      throw new RangeError(
+        `list_symbols maxResults must be at most ${MAX_SYMBOL_RESULTS}`,
+      );
+    }
+    const pathPrefix = canonicalPathPrefix(request.pathPrefix);
+    const definitions: IndexedSymbolDefinition[] = [];
+    for (const file of this.indexedFiles) {
+      if (
+        pathPrefix &&
+        file.path !== pathPrefix &&
+        !file.path.startsWith(`${pathPrefix}/`)
+      ) {
+        continue;
+      }
+      forEachLine(file.content, (line, lineNumber) => {
+        const definition = definitionForLine(file.path, line);
+        if (!definition) return true;
+        const preview = renderResultLine(line);
+        const id = stableId(
+          "match",
+          this.sourceRevision,
+          file.path,
+          String(lineNumber),
+          `symbol:${definition.name}`,
+        );
+        const symbol: IndexedSymbolDefinition = {
+          id,
+          name: definition.name,
+          definitionKind: definition.definitionKind,
+          path: file.path,
+          line: lineNumber,
+          preview,
+        };
+        this.searchHits.set(id, { id, path: file.path, line: lineNumber, preview });
+        definitions.push(symbol);
+        return definitions.length < maxResults;
+      });
+      if (definitions.length >= maxResults) break;
+    }
+    return definitions.sort(
+      (left, right) =>
+        left.path.localeCompare(right.path) ||
+        left.line - right.line ||
+        left.name.localeCompare(right.name),
+    );
+  }
+
   readLines(path: string, startLine: number, endLine: number): IndexedSourceSlice {
     const canonicalPath = canonicalRelativePath(path);
     const file = this.byPath.get(canonicalPath);
@@ -622,7 +765,6 @@ export class FileIndexedContext {
     const definitions: IndexedSymbolMatch[] = [];
     const references: IndexedSymbolMatch[] = [];
     for (const file of this.indexedFiles) {
-      const definition = definitionPattern(file.path, name);
       forEachLine(file.content, (line, lineNumber) => {
         if (!exactSymbol.test(line)) return true;
         const preview = renderResultLine(line);
@@ -639,7 +781,7 @@ export class FileIndexedContext {
           line: lineNumber,
           text: preview,
           preview,
-          kind: definition.test(line) ? "definition" : "reference",
+          kind: definitionForLine(file.path, line)?.name === name ? "definition" : "reference",
         };
         this.searchHits.set(id, { id, path: file.path, line: lineNumber, preview });
         if (match.kind === "definition") definitions.push(match);
@@ -703,6 +845,15 @@ export class FileIndexedEvidenceSession {
     const hits = this.context.findSymbol(name, options);
     for (const hit of hits) this.matches.add(hit.id);
     return hits;
+  }
+
+
+  listSymbols(
+    request?: IndexedListSymbolsRequest,
+  ): IndexedSymbolDefinition[] {
+    const definitions = this.context.listSymbols(request);
+    for (const definition of definitions) this.matches.add(definition.id);
+    return definitions;
   }
 
   readSymbol(
@@ -942,6 +1093,13 @@ export function findIndexedSymbol(
   options?: IndexedSearchOptions,
 ): IndexedSymbolMatch[] {
   return context.findSymbol(name, options);
+}
+
+export function listIndexedSymbols(
+  context: FileIndexedContext,
+  request?: IndexedListSymbolsRequest,
+): IndexedSymbolDefinition[] {
+  return defaultEvidenceSession(context).listSymbols(request);
 }
 
 export function createFileIndexedEvidenceSession(

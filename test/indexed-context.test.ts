@@ -25,6 +25,8 @@ import {
   searchIndexedFiles,
 } from "../src/file-context.ts";
 import { PiRlmRunError, PiRlmRunner } from "../src/runner.ts";
+import { createQueryEvidenceReceipt } from "../src/query-command.ts";
+import type { PiRlmFactStateSnapshot } from "../src/worker-protocol.ts";
 import { createFauxRuntime } from "./faux-runtime.ts";
 function runGit(cwd: string, args: string[]): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>();
@@ -535,11 +537,539 @@ project_answer({
       requireEvidenceProjection: true,
     });
     assert.equal(result.response, "2");
+    assert.equal(result.answerEvidenceIds.length, 1);
+    assert.equal(
+      context.resolveEvidence(result.answerEvidenceIds)[0]?.path,
+      "limits.ts",
+    );
     assert.equal(result.usage.modelCalls, 2);
     assert.match(
       result.trace.executions[0]?.error ?? "",
       /RLM_EVIDENCE_PROJECTION_REQUIRED/u,
     );
+  } finally {
+    unregister();
+  }
+});
+
+test("contract-free JSON projection recovers from a rejected penultimate selector", async () => {
+  const context = createFileIndexedContext([
+    { path: "package.json", content: '{\n  "name": "shepherd"\n}\n' },
+  ]);
+  const providerPrompts: string[] = [];
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-json-projection-recovery-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `await search_open({literal: '"name":', maxResults: 1});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+    (providerContext: Context) => {
+      providerPrompts.push(JSON.stringify(providerContext.messages));
+      return fauxAssistantMessage(
+        fauxToolCall("rlm_exec", {
+          code: `
+const [evidenceId] = get_corpus_history().flatMap((entry) => entry.evidenceIds);
+project_answer({
+  evidenceId,
+  lineContains: "package",
+  valueKind: "quoted",
+  quotedIndex: 1
+});`,
+        }),
+        { stopReason: "toolUse" },
+      );
+    },
+    (providerContext: Context) => {
+      providerPrompts.push(JSON.stringify(providerContext.messages));
+      return fauxAssistantMessage(
+        fauxToolCall("rlm_exec", {
+          code: `
+const [evidenceId] = get_corpus_history().flatMap((entry) => entry.evidenceIds);
+project_answer({
+  evidenceId,
+  lineContains: '"name":',
+  valueKind: "quoted",
+  quotedIndex: 1
+});`,
+        }),
+        { stopReason: "toolUse" },
+      );
+    },
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      limits: {
+        maxRootTurns: 3,
+        maxTokens: 20_000,
+        finalizationReserveTokens: 2_000,
+      },
+      isolation: { mode: "subprocess" },
+    }).run(context, "Return the exact package name.", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(result.response, "shepherd");
+    assert.equal(result.usage.modelCalls, 3);
+    assert.match(providerPrompts[1] ?? "", /selected line count is 0; expected 1/u);
+    assert.match(result.rootPrompt, /quotedIndex: 1/u);
+    assert.match(
+      result.trace.executions[1]?.error ?? "",
+      /selected line count is 0; expected 1/u,
+    );
+  } finally {
+    unregister();
+  }
+});
+
+test("terminal projection failure reports the last REPL error", async () => {
+  const context = createFileIndexedContext([
+    { path: "package.json", content: '{\n  "name": "shepherd"\n}\n' },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-terminal-projection-error-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `await search_open({literal: '"name":', maxResults: 1});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const [evidenceId] = get_corpus_history().flatMap((entry) => entry.evidenceIds);
+project_answer({
+  evidenceId,
+  lineContains: "package",
+  valueKind: "quoted",
+  quotedIndex: 1
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    await assert.rejects(
+      () =>
+        new PiRlmRunner(faux.getModel(), {
+          modelRuntime,
+          limits: {
+            maxRootTurns: 2,
+            maxTokens: 20_000,
+            finalizationReserveTokens: 2_000,
+          },
+          isolation: { mode: "subprocess" },
+        }).run(context, "Return the exact package name.", {
+          requireEvidenceProjection: true,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof PiRlmRunError);
+        assert.match(error.message, /selected line count is 0; expected 1/u);
+        assert.match(
+          error.trace.executions.at(-1)?.error ?? "",
+          /selected line count is 0; expected 1/u,
+        );
+        return true;
+      },
+    );
+  } finally {
+    unregister();
+  }
+});
+
+test("terminal projection no-op reports the final model tool call", async () => {
+  const context = createFileIndexedContext([
+    { path: "README.md", content: "# Shepherd\n" },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-terminal-projection-noop-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `void get_corpus_history();`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    await assert.rejects(
+      () =>
+        new PiRlmRunner(faux.getModel(), {
+          modelRuntime,
+          limits: {
+            maxRootTurns: 1,
+            maxTokens: 10_000,
+            finalizationReserveTokens: 2_000,
+          },
+          isolation: { mode: "subprocess" },
+        }).run(context, "What is this project?", {
+          requireEvidenceProjection: true,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof PiRlmRunError);
+        assert.match(error.message, /get_corpus_history/u);
+        return true;
+      },
+    );
+  } finally {
+    unregister();
+  }
+});
+
+test("contract-free bounded synthesis submits content from observed evidence", async () => {
+  const context = createFileIndexedContext([
+    {
+      path: "README.md",
+      content: "# Shepherd\n\nShepherd answers questions from bounded source evidence.\n",
+    },
+    {
+      path: "package.json",
+      content: '{\n  "name": "shepherd",\n  "description": "Evidence-bound source queries"\n}\n',
+    },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-grounded-summary-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const readme = await search_open({
+  literal: "bounded source evidence",
+  pathPrefix: "README.md",
+  maxResults: 1
+});
+const metadata = await search_open({
+  literal: "Evidence-bound source queries",
+  pathPrefix: "package.json",
+  maxResults: 1
+});
+submit_grounded_answer({
+  content: "Shepherd is a source-query tool that answers from bounded evidence.",
+  evidenceIds: [
+    readme.results[0].slice.id,
+    metadata.results[0].slice.id
+  ]
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      isolation: { mode: "subprocess" },
+    }).run(context, "What is this project?", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(
+      result.response,
+      "Shepherd is a source-query tool that answers from bounded evidence.",
+    );
+    assert.equal(result.usage.modelCalls, 1);
+    assert.equal(result.answerEvidenceIds.length, 2);
+    assert.deepEqual(
+      context.resolveEvidence(result.answerEvidenceIds).map((slice) => slice.path),
+      ["README.md", "package.json"],
+    );
+    assert.match(result.rootPrompt, /submit_grounded_answer/u);
+  } finally {
+    unregister();
+  }
+});
+
+test("bounded evidence submission can follow a metadata-only raw file read", async () => {
+  const context = createFileIndexedContext([
+    {
+      path: "README.md",
+      content: "# Shepherd\n\nShepherd answers questions from bounded source evidence.\n",
+    },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-grounded-summary-finalization-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `state.readme = await read_file("README.md");`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const slice = await read_lines("README.md", 1, 3);
+submit_grounded_answer({
+  content: "Shepherd answers questions from bounded source evidence.",
+  evidenceIds: [slice.id]
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      limits: {
+        maxRootTurns: 2,
+        maxTokens: 20_000,
+        finalizationReserveTokens: 2_000,
+      },
+      isolation: { mode: "subprocess" },
+    }).run(context, "What is this project?", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(
+      result.response,
+      "Shepherd answers questions from bounded source evidence.",
+    );
+    assert.equal(result.usage.modelCalls, 2);
+    assert.match(result.rootPrompt, /bounded synthesis over explicitly selected evidence/u);
+  } finally {
+    unregister();
+  }
+});
+
+test("list_symbols returns metadata before explicit bounded evidence selection", async () => {
+  const context = createFileIndexedContext([
+    {
+      path: "lib/selected.ts",
+      content: [
+        "export function selectedSymbol(): string {",
+        '  return "SELECTED";',
+        "}",
+        "",
+      ].join("\n"),
+    },
+    {
+      path: "lib/other.ts",
+      content: [
+        "export function otherSymbol(): string {",
+        '  return "OTHER";',
+        "}",
+        "",
+      ].join("\n"),
+    },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-list-symbols-metadata-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const definitions = await list_symbols({pathPrefix: "lib", maxResults: 2});
+if (list_observed_evidence().length !== 0) {
+  throw new Error("list_symbols must not observe source");
+}
+const selected = definitions.find((definition) => definition.name === "selectedSymbol");
+if (!selected) throw new Error("selected definition metadata is absent");
+const slice = await read_lines(selected.path, selected.line, selected.line + 2);
+submit_grounded_answer({
+  content: "selectedSymbol is defined in a bounded slice.",
+  evidenceIds: [slice.id]
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      isolation: { mode: "subprocess" },
+    }).run(context, "Return the selected symbol.", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(result.response, "selectedSymbol is defined in a bounded slice.");
+    assert.deepEqual(
+      context.resolveEvidence(result.answerEvidenceIds).map((slice) => slice.path),
+      ["lib/selected.ts"],
+    );
+    assert.match(result.rootPrompt, /list_symbols returns metadata only/u);
+    assert.match(result.rootPrompt, /bounded and read-only/u);
+  } finally {
+    unregister();
+  }
+});
+
+test("query evidence receipt unions answer and fact support IDs without source text", () => {
+  const context = createFileIndexedContext([
+    { path: "answer.ts", content: "export const answer = 'ANSWER_SOURCE_TEXT';\n" },
+    { path: "facts.ts", content: "export const fact = 'FACT_SOURCE_TEXT';\n" },
+  ]);
+  const answerEvidence = context.readLines("answer.ts", 1, 1);
+  const factEvidence = context.readLines("facts.ts", 1, 1);
+  const fact = {
+    factId: "fact",
+    description: "A grounded fact.",
+    grounding: "quoted" as const,
+    minSupports: 1,
+    status: "grounded" as const,
+    claimCount: 1,
+    evidenceIds: [factEvidence.id],
+  };
+  const facts: PiRlmFactStateSnapshot = {
+    sourceRevision: context.sourceRevision,
+    facts: [fact],
+    values: { fact: "FACT_SOURCE_TEXT" },
+    pendingFactIds: [],
+    factsById: { fact },
+  };
+
+  const receipt = createQueryEvidenceReceipt(context, [answerEvidence.id], facts);
+
+  assert.equal(receipt.corpusId, context.corpusId);
+  assert.deepEqual(receipt.answerEvidenceIds, [answerEvidence.id, factEvidence.id]);
+  assert.deepEqual(
+    receipt.evidence,
+    [answerEvidence, factEvidence].map(
+      ({ id, path, startLine, endLine, sha256, truncated }) => ({
+        id,
+        path,
+        startLine,
+        endLine,
+        sha256,
+        truncated,
+      }),
+    ),
+  );
+  assert.doesNotMatch(JSON.stringify(receipt.evidence), /ANSWER_SOURCE_TEXT|FACT_SOURCE_TEXT/u);
+});
+
+test("grounded answer submission rejects empty and unobserved evidence", async () => {
+  const context = createFileIndexedContext([
+    {
+      path: "README.md",
+      content: "# Shepherd\n\nShepherd answers questions from bounded source evidence.\n",
+    },
+  ]);
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-grounded-summary-boundary-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `submit_grounded_answer({content: "UNSUPPORTED", evidenceIds: []});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code:
+          'submit_grounded_answer({content: "UNOBSERVED", evidenceIds: ["evidence_unknown"]});',
+      }),
+      { stopReason: "toolUse" },
+    ),
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const opened = await search_open({
+  literal: "bounded source evidence",
+  pathPrefix: "README.md",
+  maxResults: 1
+});
+submit_grounded_answer({
+  content: "Shepherd answers from bounded source evidence.",
+  evidenceIds: [opened.results[0].slice.id]
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      isolation: { mode: "subprocess" },
+    }).run(context, "What is this project?", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(result.response, "Shepherd answers from bounded source evidence.");
+    assert.equal(result.usage.modelCalls, 3);
+    assert.match(
+      result.trace.executions[0]?.error ?? "",
+      /evidenceIds must be a non-empty array/u,
+    );
+    assert.match(
+      result.trace.executions[1]?.error ?? "",
+      /requires current observed evidence: evidence_unknown/u,
+    );
+  } finally {
+    unregister();
+  }
+});
+
+test("grounded answers select only evidence observed within run limits", async () => {
+  const context = createFileIndexedContext(
+    [
+      { path: "src/first.ts", content: "AAAAAAAAAA" },
+      { path: "src/second.ts", content: "BBBBBBBBBB" },
+    ],
+    {
+      maxObservationCharactersPerTurn: 10,
+      maxObservedCharactersPerRun: 10,
+    },
+  );
+  const { faux, modelRuntime, unregister } = await createFauxRuntime({
+    provider: "pi-rlm-observed-evidence-inventory-test",
+    models: [{ id: "deterministic", contextWindow: 64_000, maxTokens: 4_096 }],
+  });
+  faux.setResponses([
+    fauxAssistantMessage(
+      fauxToolCall("rlm_exec", {
+        code: `
+const first = await read_lines("src/first.ts", 1, 1);
+const second = await read_lines("src/second.ts", 1, 1);
+const observed = list_observed_evidence();
+if (observed.length !== 1 || observed[0].evidenceId !== first.id) {
+  throw new Error("unexpected observed evidence inventory");
+}
+if (observed.some((entry) => entry.evidenceId === second.id)) {
+  throw new Error("unobserved evidence leaked into inventory");
+}
+submit_grounded_answer({
+  content: "The first bounded source slice was observed.",
+  evidenceIds: observed.map((entry) => entry.evidenceId)
+});`,
+      }),
+      { stopReason: "toolUse" },
+    ),
+  ]);
+
+  try {
+    const result = await new PiRlmRunner(faux.getModel(), {
+      modelRuntime,
+      isolation: { mode: "subprocess" },
+    }).run(context, "Summarize the observed source.", {
+      requireEvidenceProjection: true,
+    });
+
+    assert.equal(result.response, "The first bounded source slice was observed.");
+    assert.match(result.rootPrompt, /list_observed_evidence/u);
   } finally {
     unregister();
   }

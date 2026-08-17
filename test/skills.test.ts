@@ -15,12 +15,17 @@ const expectedSkills = [
   "query-large-source",
 ];
 
-test("ships one valid Pi skill for each declared source use case", async () => {
+test("ships one valid skill for each declared Shepherd source use case", async () => {
   const packageJson = JSON.parse(
     await readFile(new URL("package.json", packageRoot), "utf8"),
-  ) as { pi?: { extensions?: string[]; skills?: string[] } };
+  ) as {
+    pi?: { extensions?: string[]; skills?: string[] };
+    omp?: { extensions?: string[]; skills?: string[] };
+  };
   assert.deepEqual(packageJson.pi?.extensions, ["./src/native-extension.ts"]);
   assert.deepEqual(packageJson.pi?.skills, ["./skills"]);
+  assert.deepEqual(packageJson.omp?.extensions, ["./src/native-extension.ts"]);
+  assert.deepEqual(packageJson.omp?.skills, ["./skills"]);
 
   const entries = await readdir(new URL("skills/", packageRoot), {
     withFileTypes: true,
@@ -51,6 +56,34 @@ test("ships one valid Pi skill for each declared source use case", async () => {
     assert.match(content, /model calls?|modelCalls|model-free/iu);
   }
 });
+
+test("documents query-large-source as a conversational evidence orchestrator", async () => {
+  const content = await readFile(
+    new URL("skills/query-large-source/SKILL.md", packageRoot),
+    "utf8",
+  );
+
+  for (const [requirement, pattern] of [
+    ["material ambiguity clarification", /materially ambiguous/iu],
+    ["clarification action", /\bclarif(?:y|ication)\b/iu],
+    ["frontier-model flow", /\bfrontier model\b/iu],
+    ["bounded-question decomposition", /\bdecompos(?:e|ed|ition)\b/iu],
+    ["ordinary read selection", /normal `read`/iu],
+    ["ordinary search selection", /`search`/u],
+    ["LSP selection", /\bLSP\b/u],
+    ["focused test selection", /focused test/iu],
+    ["evidence receipt", /evidence receipt/iu],
+    ["receipt corpus identity", /context\.corpusId/u],
+    ["final answer evidence IDs", /answerEvidenceIds/u],
+    ["evidence metadata", /\bsha256\b/u],
+    ["evidence-supported synthesis", /evidence-supported synthesis/iu],
+    ["native query primitive", /\/shepherd query <file-or-directory>/u],
+    ["automation escape hatch", /automation escape hatches/iu],
+  ] as const) {
+    assert.match(content, pattern, `query-large-source requires ${requirement}`);
+  }
+});
+
 
 test("exposes the same skills to OMP, Claude, and Pi", async () => {
   for (const skillsPath of [

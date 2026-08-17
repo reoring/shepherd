@@ -86,6 +86,7 @@ export interface ReplExecutionResult {
   ready: boolean;
   answerContentDefined?: boolean;
   answerContent?: string;
+  answerEvidenceIds: string[];
   error?: string;
   replan?: SubcallReplan;
   factState?: PiRlmFactStateSnapshot;
@@ -616,6 +617,7 @@ export class ReplWorkerClient {
       ready: message.ready,
       answerContentDefined: message.answerContentDefined,
       answerContent: message.answerContent,
+      answerEvidenceIds: message.answerEvidenceIds,
       error: message.error,
       replan: message.replan,
       factState: message.factState,
@@ -739,6 +741,15 @@ export class ReplWorkerClient {
           result = {
             ok: true,
             value: this.fileEvidenceSession.findSymbol(request.name, request.options),
+          };
+          break;
+        case "list_symbols":
+          if (!this.fileEvidenceSession) {
+            throw new ReplWorkerError("list_symbols requires an evidence session");
+          }
+          result = {
+            ok: true,
+            value: this.fileEvidenceSession.listSymbols(request.request),
           };
           break;
         case "get_patch_precondition":

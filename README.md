@@ -119,9 +119,11 @@ Those commands incur provider cost. They exercise the current harness rather tha
 |---|---|
 | **GO** | Registration inventories; API boundaries; config mappings; SDK/generated wiring; exact extractive facts; and source-drift checks. |
 | **Conditional** | Staged patches only for host-targeted replacement, insertion, exact multi-file wiring, and seeded one-file repair with observed evidence and a host-owned verification profile. |
-| **Not GO** | Open-ended summaries, design review, root-cause analysis, general freeform writing, replacing Direct Pi, or blindly trusting contract-free answers. |
+| **Not GO (primitive)** | A single Shepherd primitive is not GO for open-ended summaries, design review, root-cause analysis, general freeform writing, replacing Direct Pi, or blindly trusting contract-free answers. |
 
 Use a direct source read, search, language-service query, or test when that is smaller and clearer. Contract-free queries are best effort; use a reviewed typed contract when the answer needs source-fact and finalization guarantees.
+
+An outer frontier model may answer open-ended conversational requests only by orchestrating direct tools and bounded Shepherd evidence: it clarifies material ambiguity, decomposes the request, validates receipt evidence, and synthesizes the result with uncertainty. It does not trust one contract-free primitive answer as a complete summary, design, or root-cause conclusion.
 
 ## Quickstart
 
@@ -161,6 +163,29 @@ Then use the native commands:
 /shepherd query <file-or-directory> [--contract <contract.json>] -- <question>
 ```
 
+The native `/shepherd` commands are immediate low-level primitives and automation escape hatches. Shell `shepherd query` and `shepherd check`, plus the checkout commands below, are the same direct path; none require conversational skill routing. When a frontier model is answering a source question conversationally, automatic `query-large-source` routing is the primary path: it selects ordinary reads, search, language-service queries, focused tests, or bounded Shepherd evidence before synthesizing an answer from the resulting observations and receipts.
+
+### Install and activate in OMP
+
+Install Shepherd directly from GitHub as a user plugin:
+
+```bash
+omp plugin install github:reoring/shepherd
+omp plugin doctor --json
+```
+
+Restart OMP after installation or update. The plugin manifest loads the native
+`/shepherd` command and the bundled skills. Conversational source requests may
+select `query-large-source` automatically; invoke it explicitly with:
+
+```text
+/skill:query-large-source <source question>
+```
+
+Re-run `omp plugin install github:reoring/shepherd` to update the installed Git
+revision. Use `omp plugin list --json` to inspect the installed version and
+enabled state.
+
 ### Contract ownership
 
 Contracts belong in the target repository, recommended under `.rlm/contracts/`, and are reviewed and versioned with its source. A contract defines source selection and typed capture/reduction; it may additionally define a deterministic finalizer and answer pattern. Finalization and answer-pattern guarantees apply only when those fields are configured. The bundled [`examples/contracts/exact-source-value.v1.json`](examples/contracts/exact-source-value.v1.json) is a minimal parser/runtime example, not a universal contract.
@@ -189,7 +214,7 @@ Skill names describe the task; Shepherd is the public CLI and RLM is the recursi
 
 | Skill | Use |
 |---|---|
-| `query-large-source` | Ask bounded questions over large files or Git directories. |
+| `query-large-source` | Conversationally orchestrate bounded source questions, direct inspection tools, Shepherd receipts, and evidence-backed synthesis. |
 | `check-source-contract` | Validate a versioned source-fact contract with zero model calls. |
 | `check-api-boundaries` | Check HTTP routes, middleware groups, and exceptions. |
 | `check-cli-registrations` | Check command registration order, cardinality, and drift. |

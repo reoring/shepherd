@@ -20,6 +20,10 @@
     "extensions": ["./src/native-extension.ts"],
     "skills": ["./skills"]
   },
+  "omp": {
+    "extensions": ["./src/native-extension.ts"],
+    "skills": ["./skills"]
+  },
   "bin": {
     "shepherd": "src/shepherd-cli.ts"
   },

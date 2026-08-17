@@ -121,11 +121,13 @@ test("keeps normal read-only REPL startup independent from the shared deadline s
           ready: true,
           answerContentDefined: true,
           answerContent: "done",
+          answerEvidenceIds: [],
           factEvents: [],
           factExtractions: [],
           factFinalized: false,
         };
       },
+      getEvidenceSession: () => undefined,
       close: async () => undefined,
     } as unknown as ReplWorkerClient;
   };

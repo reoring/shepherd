@@ -72,14 +72,21 @@ import type {
   WorkerCallResult,
 } from "./worker-protocol.ts";
 
+const EVIDENCE_PROJECTION_INSTRUCTIONS =
+  'direct answer.content/answer.ready submissions are rejected. read_file does not issue observed evidence; use search_open, read_lines, open_match, a resolved read_symbol, or observe to obtain bounded evidence IDs. ' +
+  'For an exact single source value, call project_answer({evidenceId, lineContains, valueKind, valueAfter|quotedIndex}). ' +
+  'For a JSON quoted value, call project_answer({evidenceId, lineContains: \'"name":\', valueKind: "quoted", quotedIndex: 1}). ' +
+  'For bounded synthesis over explicitly selected evidence, call submit_grounded_answer({content, evidenceIds}) with a non-empty string and non-empty array of unique current observed evidence IDs. Immediately before submit_grounded_answer, call list_observed_evidence() and use only IDs returned by that inventory; get_corpus_history() IDs may have been issued but unobserved. Every claim in content must be supported by those selected slices. project_answer requires exactly one matching source line and owns answer.content/answer.ready; do not overwrite the projected answer.';
+
 const ROOT_SYSTEM_PROMPT = `You are the controller of a Recursive Language Model. The external context is not present in chat and exists only inside the isolated REPL.
 Your first and every subsequent response MUST invoke the rlm_exec tool. Plain text, prose, Markdown, and JSON responses are invalid. The answer object exists only inside the tool, so writing {"content": ..., "ready": true} as assistant text does not finish the task.
-The REPL has two context modes. Text mode exposes the raw string as context. File-indexed mode intentionally leaves context empty and exposes immutable metadata as files plus get_corpus_history(), list_files(), await read_file(path), await search_files({literal,pathPrefix?,maxResults?}), await search_open({literal,pathPrefix?,caseSensitive?,maxResults?,before?,after?}), await read_lines(path,startLine,endLine), await open_match(matchId,{before?,after?}), await read_symbol(name,{before?,after?,maxResults?}), await observe(evidenceIds), and await find_symbol(name). get_corpus_history() returns the read-only runtime action ledger. search_files metadata is returned automatically; search_open, read_lines, open_match, and a resolved read_symbol automatically return bounded evidence to the next turn, so do not call observe again for the same slice. search_open maxResults is 1 or 2. Full file strings stay inside the REPL and must never be printed.
+The REPL has two context modes. Text mode exposes the raw string as context. File-indexed mode intentionally leaves context empty and exposes immutable metadata as files plus get_corpus_history(), list_files(), await read_file(path), await search_files({literal,pathPrefix?,maxResults?}), await search_open({literal,pathPrefix?,caseSensitive?,maxResults?,before?,after?}), await read_lines(path,startLine,endLine), await open_match(matchId,{before?,after?}), await read_symbol(name,{before?,after?,maxResults?}), await observe(evidenceIds), list_observed_evidence(), and await find_symbol(name). get_corpus_history() returns the read-only runtime action ledger. search_files metadata is returned automatically; search_open, read_lines, open_match, and a resolved read_symbol automatically return a bounded evidence slice. observe(evidenceIds) retrieves already-issued evidence under the observation budget. list_observed_evidence() synchronously returns a frozen deterministic inventory of currently observed evidence metadata ({evidenceId,path,startLine,endLine,truncated}) without source text; get_corpus_history() IDs may have been issued but not observed.
+For source-symbol inventory, await list_symbols({pathPrefix?,maxResults?}) returns deterministic bounded definition metadata (default 40, maximum 100). It does not read or observe source; use a bounded evidence helper to inspect a selected definition.
 Use JavaScript in rlm_exec to inspect the external context and persist intermediate values in state. Call get_budget() for an immutable snapshot of remaining tokens, cost, root turns, and observation capacity. Call get_corpus_history() before every corpus helper call; both are functions and no budget or corpus_history binding exists. Exact bounded calls are cached; repeating one returns its prior local result without new corpus I/O or observation. Do not repeat an action only to rediscover it. Follow the exact context-mode subcall API in the task prompt and do not invent keys or argument shapes. Exact extraction, counting, and formatting should be completed locally when possible.
-When the question names a source identifier not already present in get_corpus_history(), call read_symbol(identifier). A resolved result contains match and slice; an ambiguous or not_found result contains matches and never selects a definition. When a new literal and path are known, call search_open instead of search_files followed by open_match. Avoid repeated broad searches and duplicate observations. Submit through answer unless the task requires project_answer. If a normal answer submission is rejected, revise answer.content inside the REPL and set answer.ready = true again; never substitute a direct chat answer.
-When the task prompt requires evidence projection, direct answer.content submissions are rejected. Call project_answer({evidenceId, lineContains: "maxDepth:", valueKind: "number", valueAfter: "maxDepth:"}) with an already observed evidence ID. Use valueKind "identifier" plus valueAfter for identifiers, or valueKind "quoted" plus quotedIndex for quoted strings. project_answer selects exactly one matching source line, applies the bounded capture, and submits its runtime-owned value; do not overwrite answer afterward.
+read_symbol accepts one source identifier. A resolved result contains match and slice; an ambiguous or not_found result contains matches and never selects a definition. search_open returns bounded evidence for a literal. Avoid repeated broad searches and duplicate observations. Submit through answer unless the task requires evidence projection. If a normal answer submission is rejected, revise answer.content inside the REPL and set answer.ready = true again; never substitute a direct chat answer.
+When the task prompt requires evidence projection, ${EVIDENCE_PROJECTION_INSTRUCTIONS}
 When a public fact contract is present, get_fact_state() and record_fact({factId,value,supports:[{evidenceId,quote}],rationale?}) are available. Inspect the first pending fact before each new source action and record supported facts immediately after observing their source. Never invent a quote or ground a fact from unobserved source. A dot-qualified name is not a valid read_symbol input; extract one source identifier first. Do not set answer.ready until every required fact is grounded.
-Use get_observed_evidence(evidenceId) to recover the exact bounded text of evidence already observed in an earlier turn. This is local, cached, and does not perform new corpus I/O. Consume helper return values and call record_fact in the same rlm_exec execution; bare expressions and returned objects are discarded rather than printed.
+Use get_observed_evidence(evidenceId) to recover the exact bounded text of evidence already observed in an earlier turn. This is local, cached, and does not perform new corpus I/O. list_observed_evidence() is also local and synchronous; immediately before submit_grounded_answer, use only IDs in its current inventory, never IDs recovered from get_corpus_history(). Consume helper return values and call record_fact in the same rlm_exec execution; bare expressions and returned objects are discarded rather than printed.
 get_fact_state() returns facts as an array plus values keyed by fact ID and pendingFactIds. Read final values as get_fact_state().values["fact-id"]; do not treat facts as an object map or read value directly from a fact.
 Typed pending facts are extracted by the runtime before the first model-authored REPL action. When the fact contract declares a runtime finalizer, the worker renders the answer from grounded facts and skips model-authored code; never attempt a parallel submission path. Without a finalizer, inspect get_fact_state() and use its grounded values. extract_pending_facts() remains available for explicit inspection of facts that are still pending after the automatic attempt.
 If rlm_exec returns RLM_SUBCALL_REPLAN_REQUIRED, do not retry the same call. Inspect last_replan and either process locally, select smaller evidence slices, or use an evidence-bound child RLM.`;
@@ -116,6 +123,7 @@ export interface PiRlmRunResult {
   subcallPrompts: string[];
   stats: SessionStats;
   trace: PiRlmFailureTrace;
+  answerEvidenceIds: string[];
   usage: PiRlmUsage;
 }
 
@@ -288,6 +296,7 @@ interface NodeRunResult {
   stats: SessionStats;
   patchPlan?: PatchPlan;
   evidenceSession?: FileIndexedEvidenceSession;
+  answerEvidenceIds?: string[];
 }
 
 interface RunTrace extends PiRlmFailureTrace {}
@@ -337,6 +346,9 @@ function extractLastAssistantText(messages: unknown[]): string {
   }
   throw new Error("Pi subcall completed without assistant text");
 }
+
+
+
 
 function questionIdentifiers(question: string): string[] {
   return [
@@ -406,8 +418,6 @@ function initialIndexedHints(
   ].join("\n");
 }
 
-
-
 function renderFactContract(contract: PiRlmFactContract | undefined): string | undefined {
   if (!contract) return undefined;
   const hasExtractors = contract.requirements.some(
@@ -451,7 +461,7 @@ function formatMetadata(
         ? `Context metadata: type=file-index, files=${context.files.length}, bytes=${context.totalBytes}. Host-selected native edit targets: ${targetSummary}. Source remains intentionally absent from chat.`
         : patchPlanning
           ? `Context metadata: type=file-index, files=${context.files.length}, bytes=${context.totalBytes}, revision=${context.sourceRevision}. Use rlm_exec to inspect source through the file-indexed REPL helpers; context is intentionally empty.`
-          : `Context metadata: type=file-index, files=${context.files.length}, bytes=${context.totalBytes}, revision=${context.sourceRevision}. Use files/list_files/read_file/search_files/search_open/read_lines/open_match/read_symbol/observe/find_symbol; context is intentionally empty.`
+          : `Context metadata: type=file-index, files=${context.files.length}, bytes=${context.totalBytes}, revision=${context.sourceRevision}. Use files/list_files/read_file/search_files/search_open/read_lines/open_match/read_symbol/observe/find_symbol/list_symbols; context is intentionally empty.`
       : `Context metadata: type=string, characters=${context.length}, lines=${context.split("\n").length}.`;
   const hints =
     context instanceof FileIndexedContext && !nativeEditMode
@@ -461,7 +471,7 @@ function formatMetadata(
     nativeEditMode
       ? undefined
       : context instanceof FileIndexedContext
-        ? 'File-indexed source API: call get_corpus_history() first and do not repeat an action only to rediscover it. Call read_symbol("Name") when the question names a new source identifier. If symbol.status === "resolved", set const slice = symbol.slice; use slice locally or call llm_query({question: "...", evidenceIds: [slice.id]}) or rlm_query({question: "...", evidenceIds: [slice.id]}). If status is ambiguous or not_found, inspect symbol.matches; never guess a definition. When a new literal and pathPrefix are known, call search_open({literal: "...", pathPrefix: "...", maxResults: 1, before: 8, after: 40}); it returns {results: [{match, slice}], truncated} and maxResults must be 1 or 2.'
+        ? 'File-indexed source API: calls are bounded and read-only. Call get_corpus_history() before each source action to avoid repeating an action. list_symbols returns metadata only; acquire selected evidence with read_lines, open_match, search_open, a resolved read_symbol, or observe. read_symbol returns resolved, ambiguous, or not_found: only a resolved result has slice; ambiguous and not_found return matches and never select a definition. Use the selected slice with await llm_query({question: "...", evidenceIds: [slice.id]}) or await rlm_query({question: "...", evidenceIds: [slice.id]}): raw source stays outside model chat. search_open({literal, pathPrefix?, caseSensitive?, maxResults?, before?, after?}) returns at most two bounded slices.'
         : 'Text subcall API: await llm_query({question: "...", evidenceIds: [], inlineContext: text}) or await rlm_query({question: "...", evidenceIds: [], inlineContext: text}).';
   const contract = publicAnswerContract
     ? `Public answer contract: ${publicAnswerContract.description}${
@@ -472,7 +482,7 @@ function formatMetadata(
     : undefined;
   const facts = renderFactContract(factContract);
   const projection = requireEvidenceProjection
-    ? 'Evidence projection required: direct answer.content/answer.ready submissions are rejected. Observe one bounded slice, then call project_answer({evidenceId: slice.id, lineContains: "exact source anchor", valueKind: "number", valueAfter: "exact source anchor"}). Use valueKind "identifier" plus valueAfter for identifiers, or valueKind "quoted" plus quotedIndex for quoted values. project_answer requires exactly one matching line and owns answer.content/answer.ready. Do not stringify helper objects or overwrite the projected answer.'
+    ? `Evidence projection required: ${EVIDENCE_PROJECTION_INSTRUCTIONS}`
     : undefined;
   const planning = nativeEditMode
     ? "Patch planning mode is host-selected native-edits. Do not submit answer.content or inspect source in chat. Call only prepare_native_edits; the host owns every target."
@@ -648,7 +658,9 @@ interface ValidatedAnswer {
 
 async function validateSubmittedAnswer(
   result: ReplExecutionResult,
-  validator?: PiRlmAnswerValidator,
+  validator: PiRlmAnswerValidator | undefined,
+  evidenceSession: FileIndexedEvidenceSession | undefined,
+  requireEvidenceProjection: boolean,
 ): Promise<ValidatedAnswer> {
   if (result.answerContentDefined !== true) {
     return { valid: false, reason: "answer.content is undefined" };
@@ -656,6 +668,21 @@ async function validateSubmittedAnswer(
   const candidate = result.answerContent ?? "";
   if (candidate.trim().length === 0) {
     return { valid: false, reason: "answer.content must not be empty" };
+  }
+  if (result.answerEvidenceIds.length > 0) {
+    if (!evidenceSession) {
+      return { valid: false, reason: "answer evidence IDs require an evidence session" };
+    }
+    try {
+      evidenceSession.resolveObservedEvidence(result.answerEvidenceIds);
+    } catch (error) {
+      return {
+        valid: false,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  } else if (requireEvidenceProjection) {
+    return { valid: false, reason: "evidence projection requires answer evidence IDs" };
   }
   if (!validator) return { valid: true, answer: candidate };
 
@@ -864,6 +891,7 @@ export class PiRlmRunner {
         rootPrompt: root.prompt,
         executionCount: root.executionCount,
         answerRejections: root.answerRejections,
+        answerEvidenceIds: root.answerEvidenceIds ?? [],
         subcallPrompts: trace.subcallPrompts,
         stats: root.stats,
         trace: structuredClone(trace),
@@ -943,6 +971,7 @@ export class PiRlmRunner {
     let answerRejections = 0;
     let answerContractError: string | undefined;
     let finalAnswer: string | undefined;
+    let finalAnswerEvidenceIds: string[] | undefined;
     let toolInvoked = false;
     let latestToolResult = "";
     let patchPlan: PatchPlan | undefined;
@@ -1023,7 +1052,7 @@ export class PiRlmRunner {
         );
         const nextAction = nextPendingFact?.extractor
           ? "Call await extract_pending_facts() now. Do not write source extraction JavaScript."
-          : "Use an initial indexed hint to call read_symbol, search_open, or read_lines now. Use get_observed_evidence for an earlier evidence ID, consume its text, and call record_fact in the same execution. Do not inspect globalThis, return a bare object, or repeat get_fact_state without progress.";
+          : "Use the initial indexed hints: call read_symbol(identifier) for a hinted source identifier, search_open({literal, pathPrefix?, maxResults: 1, before: 0, after: 0}) for a bounded literal search, or read_lines(path,startLine,endLine) for a hinted file location. For earlier evidence, call get_observed_evidence(evidenceId). Consume its text and call record_fact in the same execution. Do not inspect globalThis, return a bare object, or repeat get_fact_state without progress.";
         const factActionText = factActionRequired
           ? [
               "RLM_FACT_ACTION_REQUIRED",
@@ -1294,9 +1323,15 @@ export class PiRlmRunner {
           };
         }
 
-        const validation = await validateSubmittedAnswer(result, validateAnswer);
+        const validation = await validateSubmittedAnswer(
+          result,
+          validateAnswer,
+          worker.getEvidenceSession(),
+          requireEvidenceProjection,
+        );
         if (validation.valid) {
           finalAnswer = validation.answer;
+          finalAnswerEvidenceIds = [...result.answerEvidenceIds];
           latestToolResult = executionText || "Answer submitted.";
           activeSessionAbort?.();
           return {
@@ -1641,7 +1676,7 @@ export class PiRlmRunner {
                     }`
                   : undefined,
                 requireEvidenceProjection
-                  ? "Evidence projection remains required. Do not submit answer.content directly; finish with project_answer over one observed evidence slice."
+                  ? "Evidence projection remains required."
                   : undefined,
                 patchPlanning
                   ? nativeEditMode
@@ -1678,11 +1713,12 @@ export class PiRlmRunner {
                 : factContract
                   ? "FINALIZATION TURN: use only existing REPL state and observed evidence. Do not search, read, or delegate again. Call get_fact_state(), use get_observed_evidence for pending facts, consume helper results and call record_fact in this same rlm_exec execution, then read final values from get_fact_state().values[\"fact-id\"] and submit only when all pendingFactIds are gone. The facts field is an array and bare returned objects are discarded. Do not guess a missing fact."
                   : requireEvidenceProjection
-                    ? "FINALIZATION TURN: use only existing observed evidence. Do not search, read, delegate, stringify helper objects, or submit answer.content directly. Call project_answer with an observed evidenceId and a bounded single-value extractor."
+                    ? "FINALIZATION TURN: use only existing observed evidence. Do not search, read, or delegate again. Submit through project_answer or submit_grounded_answer using only existing observed evidence; do not submit answer.content directly."
                     : "FINALIZATION TURN: use only existing REPL state and observed evidence. Do not search, read, or delegate again. In this rlm_exec call, compute the source-grounded answer, set answer.content, and set answer.ready = true.";
-        const turnPrompt = isFinalizationTurn
-          ? `${baseTurnPrompt}\n\n${finalizationInstruction}`
-          : baseTurnPrompt;
+        const turnPrompt =
+          isFinalizationTurn && finalizationInstruction
+            ? [baseTurnPrompt, finalizationInstruction].join("\n\n")
+            : baseTurnPrompt;
         const { session } = await createAgentSession({
           cwd: this.cwd,
           model: this.model,
@@ -1772,23 +1808,25 @@ export class PiRlmRunner {
         };
       }
       if (finalAnswer === undefined) {
-        const diagnostic =
-          terminalError ??
-          inspect(
-            allMessages.findLast(
-              (message) =>
-                Boolean(
-                  message &&
-                    typeof message === "object" &&
-                    "role" in message &&
-                    message.role === "assistant",
-                ),
+        const lastExecution = trace.executions.at(-1);
+        const lastAssistant = allMessages.findLast(
+          (message) =>
+            Boolean(
+              message &&
+                typeof message === "object" &&
+                "role" in message &&
+                message.role === "assistant",
             ),
-            { depth: 4 },
-          ).slice(0, 4_000);
+        );
+        const diagnostic =
+          lastExecution?.error ??
+          terminalError ??
+          (lastAssistant
+            ? inspect(lastAssistant, { depth: 4 }).slice(0, 4_000)
+            : "The final REPL execution completed without submitting an answer.");
         throw new Error(
-          `Pi RLM node at depth ${depth} stopped before the REPL submitted a ${
-            patchPlanning ? "PatchPlan" : "answer"
+          `Pi RLM node at depth ${depth} stopped before the REPL submitted ${
+            patchPlanning ? "a PatchPlan" : "an answer"
           } after ${executionCount} executions: ${diagnostic}`,
         );
       }
@@ -1800,6 +1838,7 @@ export class PiRlmRunner {
         executionCount,
         answerRejections,
         stats: finalStats,
+        answerEvidenceIds: finalAnswerEvidenceIds ?? [],
       };
     } finally {
       await worker.close();

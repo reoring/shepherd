@@ -4,6 +4,7 @@ import { inspect } from "node:util";
 import { createContext, Script, type Context as VmContext } from "node:vm";
 import type {
   IndexedFileSearchRequest,
+  IndexedListSymbolsRequest,
   IndexedObservationResult,
   IndexedOpenMatchOptions,
   IndexedReadSymbolOptions,
@@ -13,6 +14,7 @@ import type {
   IndexedSearchOptions,
   IndexedSearchHit,
   IndexedSymbolMatch,
+  IndexedSymbolDefinition,
   IndexedSourceSlice,
 } from "./file-context.ts";
 import {
@@ -99,6 +101,7 @@ let vmContext: VmContext | undefined;
 let answer: AnswerHandle | undefined;
 let requireEvidenceProjection = false;
 let projectedAnswerContent: string | undefined;
+let answerEvidenceIds: string[] = [];
 let stdout: string[] = [];
 let observations: IndexedObservationResult[] = [];
 let searchResults: IndexedSearchHit[] = [];
@@ -327,6 +330,26 @@ function getObservedEvidence(
   return Object.freeze({ ...evidence, evidenceId: evidence.id });
 }
 
+function listObservedEvidence(): readonly Readonly<{
+  evidenceId: string;
+  path: string;
+  startLine: number;
+  endLine: number;
+  truncated: boolean;
+}>[] {
+  const inventory = [...observedEvidence.values()]
+    .map((evidence) =>
+      Object.freeze({
+        evidenceId: evidence.id,
+        path: evidence.path,
+        startLine: evidence.startLine,
+        endLine: evidence.endLine,
+        truncated: evidence.truncated,
+      }),
+    )
+    .sort((left, right) => left.evidenceId.localeCompare(right.evidenceId));
+  return Object.freeze(inventory);
+}
 function factInputEvidenceIds(input: unknown): string[] {
   if (!input || typeof input !== "object" || !("supports" in input)) return [];
   const supports = (input as { supports?: unknown }).supports;
@@ -684,6 +707,13 @@ function applyFactFinalizer(): boolean {
   if (content === undefined) return false;
   answer.content = content;
   answer.ready = true;
+  answerEvidenceIds = [
+    ...new Set(
+      state.facts
+        .filter((fact) => fact.status === "grounded")
+        .flatMap((fact) => fact.evidenceIds),
+    ),
+  ];
   if (vmContext) vmContext.answer = answer;
   return true;
 }
@@ -696,15 +726,20 @@ function incompleteFactBlock(): PiRlmFactFinalizationBlock | undefined {
     .filter((fact) => fact.status === "pending")
     .map((fact) => fact.factId);
   if (pendingFactIds.length === 0) return undefined;
-  answer.content = "";
-  answer.ready = false;
-  if (vmContext) vmContext.answer = answer;
+  resetAnswerSubmission();
   return { code: "RLM_FACTS_INCOMPLETE", pendingFactIds };
 }
 const corpusActionCache = new Map<string, CachedCorpusAction>();
 const corpusHistoryEntries: MutableCorpusHistoryEntry[] = [];
 const MAX_VISIBLE_CORPUS_HISTORY = 12;
+const GROUNDED_ANSWER_FIELDS: Readonly<Record<string, true>> = Object.freeze({
+  content: true,
+  evidenceIds: true,
+});
+
+
 function resetAnswerSubmission(): void {
+  answerEvidenceIds = [];
   if (!answer) return;
   answer.content = "";
   answer.ready = false;
@@ -770,6 +805,7 @@ function projectAnswer(input: unknown): Readonly<{
   answer.content = output.value;
   answer.ready = true;
   projectedAnswerContent = output.value;
+  answerEvidenceIds = [request.evidenceId];
   if (vmContext) vmContext.answer = answer;
   return Object.freeze({
     value: output.value,
@@ -777,6 +813,54 @@ function projectAnswer(input: unknown): Readonly<{
     supportQuotes: output.supportQuotes,
   });
 }
+
+function submitGroundedAnswer(input: unknown) {
+  if (!answer) throw new Error("answer state is not initialized");
+  resetAnswerSubmission();
+  const request = requireExactOwnFields(
+    input,
+    GROUNDED_ANSWER_FIELDS,
+    "submit_grounded_answer input",
+  );
+  const content = request.content;
+  if (typeof content !== "string" || content.length === 0) {
+    throw new TypeError("submit_grounded_answer content must be a non-empty string");
+  }
+  const evidenceIds = request.evidenceIds;
+  if (!Array.isArray(evidenceIds) || evidenceIds.length === 0) {
+    throw new TypeError(
+      "submit_grounded_answer evidenceIds must be a non-empty array",
+    );
+  }
+  const uniqueEvidenceIds = new Set<string>();
+  for (const evidenceId of evidenceIds) {
+    if (typeof evidenceId !== "string" || evidenceId.length === 0) {
+      throw new TypeError(
+        "submit_grounded_answer evidenceIds must contain non-empty strings",
+      );
+    }
+    if (uniqueEvidenceIds.has(evidenceId)) {
+      throw new TypeError(
+        `submit_grounded_answer evidenceIds must not contain duplicates: ${evidenceId}`,
+      );
+    }
+    const evidence = observedEvidence.get(evidenceId);
+    if (!evidence || evidence.revision !== evidenceSourceRevision) {
+      throw new Error(
+        `submit_grounded_answer requires current observed evidence: ${evidenceId}`,
+      );
+    }
+    uniqueEvidenceIds.add(evidenceId);
+  }
+  const receiptEvidenceIds = Object.freeze([...uniqueEvidenceIds]);
+  answerEvidenceIds = [...uniqueEvidenceIds];
+  answer.content = content;
+  answer.ready = true;
+  projectedAnswerContent = content;
+  if (vmContext) vmContext.answer = answer;
+  return Object.freeze({ content, evidenceIds: receiptEvidenceIds });
+}
+
 
 function enforceEvidenceProjection(): void {
   if (!requireEvidenceProjection || !answer?.ready) return;
@@ -790,13 +874,14 @@ function enforceEvidenceProjection(): void {
   }
   resetAnswerSubmission();
   throw new Error(
-    "RLM_EVIDENCE_PROJECTION_REQUIRED: contract-free file answers must use project_answer({evidenceId,lineContains,valueKind,valueAfter|quotedIndex}). Direct answer.content submissions are rejected.",
+    "RLM_EVIDENCE_PROJECTION_REQUIRED: contract-free file answers must use project_answer({evidenceId,lineContains,valueKind,valueAfter|quotedIndex}) for exact single values or submit_grounded_answer({content, evidenceIds}) for bounded synthesis over explicitly selected evidence. Direct answer.content submissions are rejected.",
   );
 }
 
 function applyAnswerValue(value: unknown): void {
   if (!answer) return;
   projectedAnswerContent = undefined;
+  answerEvidenceIds = [];
   if (value !== null && typeof value === "object" && "content" in value) {
     const candidate = value as { content: unknown; ready?: unknown };
     answer.content = candidate.content;
@@ -1021,6 +1106,37 @@ function normalizeSearchFilesRequest(input: unknown): IndexedFileSearchRequest {
   };
 }
 
+const LIST_SYMBOLS_REQUEST_FIELDS: Record<string, true> = {
+  pathPrefix: true,
+  maxResults: true,
+};
+
+function normalizeListSymbolsRequest(input: unknown): IndexedListSymbolsRequest {
+  if (input === undefined) return {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("list_symbols request must be an object");
+  }
+  const record = input as Record<string, unknown>;
+  for (const field in record) {
+    if (!Object.hasOwn(record, field)) {
+      throw new TypeError(`list_symbols request contains inherited field ${field}`);
+    }
+    if (LIST_SYMBOLS_REQUEST_FIELDS[field] !== true) {
+      throw new TypeError(`list_symbols request contains unknown field ${field}`);
+    }
+  }
+  if (record.pathPrefix !== undefined && typeof record.pathPrefix !== "string") {
+    throw new TypeError("list_symbols pathPrefix must be a string");
+  }
+  if (record.maxResults !== undefined && typeof record.maxResults !== "number") {
+    throw new TypeError("list_symbols maxResults must be a number");
+  }
+  return {
+    ...(record.pathPrefix !== undefined ? { pathPrefix: record.pathPrefix as string } : {}),
+    ...(record.maxResults !== undefined ? { maxResults: record.maxResults as number } : {}),
+  };
+}
+
 async function readFile(input: unknown): Promise<string> {
   const path = normalizeReadFilePath(input);
   const value = await requestCorpus({ operation: "read_file", path });
@@ -1164,6 +1280,22 @@ async function findSymbol(
   return hits;
 }
 
+
+async function listSymbols(input: unknown = {}): Promise<IndexedSymbolDefinition[]> {
+  const request = normalizeListSymbolsRequest(input);
+  const { value, cached } = await requestCachedCorpus({
+    operation: "list_symbols",
+    request,
+  });
+  if (!Array.isArray(value)) throw new TypeError("list_symbols received a non-array result");
+  const definitions = value as IndexedSymbolDefinition[];
+  if (!cached) {
+    searchResults.push(
+      ...definitions.map(({ id, path, line, preview }) => ({ id, path, line, preview })),
+    );
+  }
+  return definitions;
+}
 function patchPreconditionKey(request: PatchPreconditionRequest): string {
   return [
     request.path,
@@ -1650,6 +1782,7 @@ function initialize(descriptor: WorkerContextDescriptor): void {
   requireEvidenceProjection =
     descriptor.kind === "files" && descriptor.answerMode === "evidence-projected";
   projectedAnswerContent = undefined;
+  answerEvidenceIds = [];
   answer = createAnswerHandle();
   corpusActionCache.clear();
   corpusHistoryEntries.length = 0;
@@ -1689,12 +1822,15 @@ function initialize(descriptor: WorkerContextDescriptor): void {
       read_symbol: readSymbol,
       observe: observeEvidence,
       find_symbol: findSymbol,
+      list_symbols: listSymbols,
       state,
       get_corpus_history: getCorpusHistory,
       get_budget: getBudget,
       get_fact_state: getFactState,
       get_observed_evidence: getObservedEvidence,
+      list_observed_evidence: listObservedEvidence,
       project_answer: projectAnswer,
+      submit_grounded_answer: submitGroundedAnswer,
       record_fact: recordFact,
       extract_fact: extractFact,
       extract_pending_facts: extractPendingFacts,
@@ -1742,6 +1878,7 @@ async function execute(
       corpusHistory: corpusHistorySnapshot(),
       searchResults: [],
       ready: false,
+      answerEvidenceIds: [],
       error: "Worker is not initialized",
       factState: factStateSnapshot(),
       factEvents: [],
@@ -1784,6 +1921,7 @@ async function execute(
       answerContentDefined: answer.ready ? answer.content !== undefined : undefined,
       answerContent:
         answer.ready && answer.content !== undefined ? String(answer.content) : undefined,
+      answerEvidenceIds: answer.ready ? [...answerEvidenceIds] : [],
       factState: factStateSnapshot(),
       factEvents: structuredClone(factEvents),
       factExtractions: structuredClone(factExtractionEvents),
@@ -1809,6 +1947,7 @@ async function execute(
         corpusHistory: corpusHistorySnapshot(),
         searchResults: structuredClone(searchResults),
         ready: false,
+        answerEvidenceIds: [],
         replan: error.replan,
         factState: factStateSnapshot(),
         factEvents: structuredClone(factEvents),
@@ -1832,6 +1971,7 @@ async function execute(
       corpusHistory: corpusHistorySnapshot(),
       searchResults: structuredClone(searchResults),
       ready: false,
+      answerEvidenceIds: [],
       error: error instanceof Error ? error.message : String(error),
       factState: factStateSnapshot(),
       factEvents: structuredClone(factEvents),

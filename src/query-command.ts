@@ -8,11 +8,49 @@ import { loadIndexedPathContext, type FileIndexedContext } from "./file-context.
 import { DEFAULT_RLM_LIMITS } from "./rlm-defaults.ts";
 import type { ShepherdQueryCliArguments } from "./shepherd-command.ts";
 import { PiRlmRunError, PiRlmRunner } from "./runner.ts";
+import type { PiRlmFactStateSnapshot } from "./worker-protocol.ts";
 
 interface QueryInput {
   context: FileIndexedContext;
   contractFile?: RlmContractFile;
   answerPattern?: RegExp;
+}
+export interface QueryEvidenceReceipt {
+  corpusId: string;
+  answerEvidenceIds: string[];
+  evidence: Array<{
+    id: string;
+    path: string;
+    startLine: number;
+    endLine: number;
+    sha256: string;
+    truncated: boolean;
+  }>;
+}
+
+export function createQueryEvidenceReceipt(
+  context: FileIndexedContext,
+  answerEvidenceIds: readonly string[],
+  facts: PiRlmFactStateSnapshot | undefined,
+): QueryEvidenceReceipt {
+  const selectedIds = new Set(answerEvidenceIds);
+  for (const fact of facts?.facts ?? []) {
+    if (fact.status !== "grounded") continue;
+    for (const evidenceId of fact.evidenceIds) selectedIds.add(evidenceId);
+  }
+  const resolved = context.resolveEvidence([...selectedIds]);
+  return {
+    corpusId: context.corpusId,
+    answerEvidenceIds: [...selectedIds],
+    evidence: resolved.map(({ id, path, startLine, endLine, sha256, truncated }) => ({
+      id,
+      path,
+      startLine,
+      endLine,
+      sha256,
+      truncated,
+    })),
+  };
 }
 
 function modelParts(spec: string): { provider: string; modelId: string } {
@@ -115,6 +153,11 @@ export async function runShepherdQueryCommand(
         : undefined,
     });
     const finalFacts = result.trace.facts.finalState;
+    const evidenceReceipt = createQueryEvidenceReceipt(
+      input.context,
+      result.answerEvidenceIds,
+      finalFacts,
+    );
     const output = {
       status: "passed" as const,
       contextPath: parsed.contextPath,
@@ -124,9 +167,12 @@ export async function runShepherdQueryCommand(
       context: {
         type: "files" as const,
         sourceRevision: input.context.sourceRevision,
+        corpusId: evidenceReceipt.corpusId,
         files: input.context.files.length,
         totalBytes: input.context.totalBytes,
       },
+      answerEvidenceIds: evidenceReceipt.answerEvidenceIds,
+      evidence: evidenceReceipt.evidence,
       answer: result.response,
       executionCount: result.executionCount,
       answerRejections: result.answerRejections,

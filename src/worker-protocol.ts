@@ -1,6 +1,7 @@
 import type {
   FileContextMetadata,
   IndexedFileSearchRequest,
+  IndexedListSymbolsRequest,
   IndexedObservationResult,
   IndexedOpenMatchOptions,
   IndexedSearchHit,
@@ -289,6 +290,7 @@ export type CorpusCallRequest =
   | { operation: "read_symbol"; name: string; options?: IndexedReadSymbolOptions }
   | { operation: "observe"; evidenceIds: EvidenceId[] }
   | { operation: "find_symbol"; name: string; options?: IndexedSearchOptions }
+  | { operation: "list_symbols"; request: IndexedListSymbolsRequest }
   | {
       operation: "get_patch_precondition";
       request: PatchPreconditionRequest;
@@ -342,6 +344,7 @@ export type WorkerToParentMessage =
       answerContentDefined?: boolean;
       searchResults: IndexedSearchHit[];
       answerContent?: string;
+      answerEvidenceIds: EvidenceId[];
       error?: string;
       replan?: SubcallReplan;
       factState?: PiRlmFactStateSnapshot;
