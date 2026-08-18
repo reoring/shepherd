@@ -98,7 +98,27 @@ The same matched-patch benchmark (three tasks × 5 repeats per harness, thinking
 
 Token accounting: the local endpoint reports prompt-cache reads. The Direct Pi agent session accumulates history without compaction, so later calls resend the growing prefix and it is billed as cache reads (34,676 tokens, 74% of its total). `totalTokens` includes cache reads 1:1, so the headline token gap is inflated; on fresh (non-cached) tokens Direct Pi is actually lower. The Luna table above has zero cache reads on both harnesses, so its token delta is entirely fresh.
 
-Model robustness: Shepherd's 15/15 accepted-correct, zero false successes, zero scope violations, 30 model calls, and the latency win hold on both Luna and Qwen. Direct Pi's quality is model-dependent (9/15 on Luna, 14/15 on Qwen). `contextWindow` is not used in any Shepherd limit; `maxTokens` is a per-run reservation budget, not a context cap.
+Model robustness: Shepherd's 15/15 accepted-correct, zero false successes, zero scope violations, and 30 model calls hold on both Luna and Qwen. Direct Pi's quality (9/15 on Luna, 14/15 on Qwen) and the latency winner (Direct Pi on Luna, Shepherd on Qwen) are model-dependent. `contextWindow` is not used in any Shepherd limit; `maxTokens` is a per-run reservation budget, not a context cap.
+
+### Luna versus Qwen — same matched-patch benchmark, two models
+
+The two tables above re-run the same matched-patch benchmark (three tasks × 5 repeats per harness, thinking off, identical limits) on two different models. They are bound to different harness commits (Luna at [c9b0c94](https://github.com/reoring/shepherd/commit/c9b0c9461e63a588c37f1f48ab5040619352c169), Qwen at [f1189f8](https://github.com/reoring/shepherd/commit/f1189f8769a6bee06da2dc38960d3a078e0e25f6)); the harness changed between them, so this is a cross-model comparison, not a controlled A/B.
+
+| Metric | Luna (c9b0c94) | Qwen (f1189f8) |
+|---|---:|---:|
+| Shepherd accepted-correct | 15/15 | 15/15 |
+| Direct Pi accepted-correct | 9/15 | 14/15 |
+| Direct Pi false successes | 6 | 1 |
+| Direct Pi scope violations | 4 | 1 |
+| Shepherd model calls | 30 | 30 |
+| Direct Pi model calls | 52 | 50 |
+| Shepherd latency | 102.1 s | 84.0 s |
+| Direct Pi latency | 91.6 s | 146.8 s |
+| Latency winner | Direct Pi (Shepherd +11.6%) | Shepherd (−42.8%) |
+
+What holds on both models (model-robust): Shepherd's 15/15 accepted-correct, zero false successes, zero scope violations, and 30 model calls.
+
+What changes with the model (model-dependent): Direct Pi's quality (9/15 on Luna, 14/15 on Qwen) and which harness is faster (Direct Pi on Luna, Shepherd on Qwen).
 
 ### Historical pre-release evidence — matched large-source extraction
 
