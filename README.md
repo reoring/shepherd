@@ -120,6 +120,8 @@ What holds on both models (model-robust): Shepherd's 15/15 accepted-correct, zer
 
 What changes with the model (model-dependent): Direct Pi's quality (9/15 on Luna, 14/15 on Qwen) and which harness is faster (Direct Pi on Luna, Shepherd on Qwen).
 
+Takeaway: on this local model, Qwen is a stronger freeform patcher than Luna (Direct Pi 14/15 vs 9/15) but slower and more wasteful (146.8 s, cache-inflated tokens). Running it through Shepherd recovers both correctness (15/15) and speed (84.0 s — the faster of the two harnesses on Qwen, whereas on Luna Direct Pi was faster). This is one 5-repeat run across two harness commits: directional, not stability evidence.
+
 ### Historical pre-release evidence — matched large-source extraction
 
 With GPT-5.6 Luna, thinking off, the same model, questions, exact source, and limits, three cases were repeated three times per harness (9 runs per harness). The pre-release runtime then labelled Pi-RLM, now shipped as Shepherd, completed **9/9** correctly versus Direct Pi's **3/9**: **+66.7 percentage points**.
